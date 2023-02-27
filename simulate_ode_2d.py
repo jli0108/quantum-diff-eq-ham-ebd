@@ -5,7 +5,7 @@ from os.path import join
 from time import time
 
 start = time()
-DATA_DIR = "data"
+DATA_DIR = "data_2d"
 
 C6 = 862690 * 2 * np.pi # Rydberg interaction constant (MHz⋅μm^6)
 R = 4.0 # Lattice scale / μm
@@ -113,6 +113,7 @@ psi_0 /= np.linalg.norm(psi_0)
 psi = expm_multiply(-1j * H, psi_0, start=0, stop=ts, num=num_time_points)
 
 psi_subspace = np.zeros((num_time_points,n+1,n+1), dtype=np.complex128)
+bitstring_1 = [k % 2 for k in range(n)]
 for i in range(n+1):
 
     bitstring_2 = [k % 2 for k in range(n)]

@@ -6,4 +6,4 @@
 
 # module load python
 
-# python simulate_ode.py
+# python simulate_ode_2d.py
