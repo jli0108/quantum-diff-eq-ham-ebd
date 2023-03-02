@@ -5,7 +5,7 @@ from os.path import join
 from time import time
 
 start = time()
-DATA_DIR = "data_1d"
+DATA_DIR = "data_1d_sq"
 
 C6 = 862690 * 2 * np.pi # Rydberg interaction constant (MHz⋅μm^6)
 R = 4.0 # Lattice scale / μm
@@ -50,7 +50,7 @@ for i in range(N-1):
     x_midpoints[i] = (x[i] + x[i+1]) / 2
 
 # Functions in the ODE problem
-F0 = 0.5 * x_midpoints
+F0 = x_midpoints ** 2
 
 # Rydberg atoms
 chain_locations = np.zeros(n)
@@ -98,7 +98,7 @@ psi_0 /= np.linalg.norm(psi_0)
 # faster but should require more memory to store state vector for all time points
 psi = expm_multiply(-1j * H, psi_0, start=0, stop=ts, num=num_time_points)
 
-psi_subspace = np.zeros((num_time_points,n+1,n+1), dtype=np.complex128)
+psi_subspace = np.zeros((num_time_points,n+1), dtype=np.complex128)
 
 bitstring = [k % 2 for k in range(n)]
 for i in range(n+1):
