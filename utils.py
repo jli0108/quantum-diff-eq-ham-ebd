@@ -12,7 +12,7 @@ IDENTITY = csc_matrix(np.eye(2))
 NUMBER = csc_matrix(np.array([[0, 0], [0, 1]]))
 
 def tensor(op_list : list):
-    return reduce(kron, op_list, 1)
+    return reduce(kron, op_list, 1).tocsc()
 
 def uniform_superposition(n : int):
     return np.ones(2 ** n) / np.sqrt(2 ** n)
@@ -27,7 +27,7 @@ def sum_x(n : int) -> np.ndarray:
 
     res = csc_matrix((2 ** n, 2 ** n))
     for i in range(n):
-        res += tensor([identity(dims[i], format='csr'), PAULI_X, identity(dims[n-i-1], format='csr')])
+        res += tensor([identity(dims[n-i-1], format='csr'), PAULI_X, identity(dims[i], format='csr')])
         
     return res
 
@@ -42,7 +42,7 @@ def sum_y(n : int) -> np.ndarray:
     
     res = csc_matrix((2 ** n, 2 ** n))
     for i in range(n):
-        res += tensor([identity(dims[i], format='csr'), PAULI_Y, identity(dims[n-i-1], format='csr')])
+        res += tensor([identity(dims[n-i-1], format='csr'), PAULI_Y, identity(dims[i], format='csr')])
         
     return res
 
@@ -60,6 +60,23 @@ def sum_h_x(n : int, h : np.ndarray) -> np.ndarray:
     res = csc_matrix((2 ** n, 2 ** n))
     for i in range(n):
         res += tensor([identity(dims[n-i-1], format='csr'), h[i] * PAULI_X, identity(dims[i], format='csr')])
+        
+    return res
+
+def sum_h_y(n : int, h : np.ndarray) -> np.ndarray:
+    '''
+    Returns `\sum_i h_i \sigma_y^{(i)}` where `\sigma_y^{(i)}` 
+    is the Pauli-y operator on the ith qubit.
+    '''
+    assert n > 0
+    assert len(h) == n
+
+    dims = [2 ** i for i in range(n)]
+    
+
+    res = csc_matrix((2 ** n, 2 ** n))
+    for i in range(n):
+        res += tensor([identity(dims[n-i-1], format='csr'), h[i] * PAULI_Y, identity(dims[i], format='csr')])
         
     return res
 
