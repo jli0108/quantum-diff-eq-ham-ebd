@@ -1,3 +1,3 @@
 # pde-project
 
-Project for solving PDEs on analog quantum simulators.
+Project for solving PDEs on quantum computers.
