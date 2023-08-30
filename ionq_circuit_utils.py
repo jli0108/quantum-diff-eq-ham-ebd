@@ -483,7 +483,7 @@ def state_prep_braket(N, dimension, amplitudes, encoding):
     return circuit
 
 def state_prep_circuit(N, dimension, amplitudes, encoding):
-    
+    assert np.abs(np.linalg.norm(amplitudes) - 1) < 1e-6
 
     n = num_qubits_per_dim(N, encoding)
     instructions = []
