@@ -521,7 +521,7 @@ def state_prep_circuit(N, dimension, amplitudes, encoding):
 
             instructions += state_prep_one_hot_aux(n, i * n, amplitudes_abs_val)
 
-            if not np.all(np.isreal(amplitudes)) and np.all(amplitudes >= 0):
+            if not (np.all(np.isreal(amplitudes)) and np.all(amplitudes >= 0)):
                 for k in range(N):
                     theta = np.angle(amplitudes[k])
                     instructions.append(get_rz(i * n + k, theta))
