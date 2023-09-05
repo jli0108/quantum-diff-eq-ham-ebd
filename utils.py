@@ -193,3 +193,140 @@ def beta_2(x):
 
 def beta_3(x):
     return 2
+
+def get_codewords_1d(n : int, encoding, periodic):
+    
+    codewords = []
+
+    if encoding == "unary" or encoding == "antiferromagnetic":
+        if encoding == "unary":
+            bitstring = 0
+        elif encoding == "antiferromagnetic":
+            bitstring = 0
+            for k in range(n):
+                if k % 2 == 1:
+                    bitstring += 1 << k
+
+        if periodic:
+            for i in range(2 * n):
+                codewords.append(bitstring)
+                bitstring ^= 1 << (i % n)
+        else:
+            for i in range(n+1):
+                codewords.append(bitstring)
+
+                if i < n:
+                    bitstring ^= 1 << i
+    
+    elif encoding == "one-hot":
+
+        bitstring = 1
+
+        for i in range(n):
+            codewords.append(bitstring)
+
+            if i < n - 1:
+                bitstring ^= (1 << i)
+                bitstring ^= (1 << (i+1))
+    return codewords
+
+def get_codewords(N : int, dimension: int, encoding, periodic=False):
+    '''Returns codewords for a given encoding.'''
+
+    n = num_qubits_per_dim(N, encoding)
+    codewords_1d = get_codewords_1d(n, encoding, periodic)
+    codewords = []
+
+    indices = np.zeros(dimension, dtype=int)
+    for i in range(N ** dimension):
+        assert np.all(indices <= N - 1)
+
+        codeword = 0
+        for j in range(dimension):
+            codeword += (2 ** (j * n)) * codewords_1d[indices[j]]
+        codewords.append(codeword)
+        
+        if i < N ** dimension - 1:
+            # Increment indices
+            indices[-1] += 1
+            for j in np.arange(dimension):
+                if (indices[dimension - 1 - j] >= N):
+                    indices[dimension - 1 - j - 1] += 1
+                    indices[dimension - 1 - j] %= N
+
+    return codewords
+
+def num_qubits_per_dim(N, encoding):
+    if encoding == "one-hot":
+        return N
+    elif encoding == "unary" or encoding == "antiferromagnetic":
+        return N - 1
+    else:
+        raise ValueError("Encoding not supported. Valid encodings: unary, antiferromagnetic, one-hot")
+    
+def get_bitstrings_1d(N, encoding):
+    bitstrings = []
+
+    if encoding == "unary":
+        bitstring = (N-1) * ["0"]
+        for i in range(N):
+            bitstrings.append("".join(bitstring))
+            if i < N - 1:
+                bitstring[i] = "1"
+
+        return bitstrings
+    
+    elif encoding == "antiferromagnetic":
+        bitstring = []
+        for i in range(N-1):
+            if i % 2 == 0:
+                bitstring.append("0")
+            else:
+                bitstring.append("1")
+
+        for i in range(N):
+            bitstrings.append("".join(bitstring))
+            if i < N - 1:
+                if i % 2 == 0:
+                    bitstring[i] = "1"
+                else:
+                    bitstring[i] = "0"
+
+        return bitstrings
+        
+    elif encoding == "one-hot":
+        bitstring = N * ["0"]
+        for i in range(N):
+            bitstring[i] = "1"
+            if i > 0:
+                bitstring[i-1] = "0"
+
+            bitstrings.append("".join(bitstring))
+
+        return bitstrings
+    else:
+        return ValueError("Encoding not supported.")
+
+def get_bitstrings(N, dimension, encoding):
+    bitstrings_1d = get_bitstrings_1d(N, encoding)
+    N = len(bitstrings_1d)
+
+    bitstrings = []
+    indices = np.zeros(dimension, dtype=int)
+    for i in range(N ** dimension):
+        
+        assert np.all(indices <= N - 1)
+        bitstring = []
+        for j in range(dimension):
+            bitstring.append(bitstrings_1d[indices[j]])
+        bitstrings.append("".join(bitstring))
+        
+        if i < N ** dimension - 1:
+            # Increment indices
+            indices[-1] += 1
+            for j in np.arange(dimension):
+                if (indices[dimension - 1 - j] >= N):
+                    indices[dimension - 1 - j - 1] += 1
+                    indices[dimension - 1 - j] %= N
+                
+    return bitstrings
