@@ -57,7 +57,7 @@ chain_locations = np.zeros(n)
 for k in range(n):
     chain_locations[k] = R * (n - 1 - k)
 
-qubit_locations = np.concatenate([chain_locations, chain_locations])
+qubit_locations = chain_locations
 
 detuning = np.zeros(n)
 for i in range(n):

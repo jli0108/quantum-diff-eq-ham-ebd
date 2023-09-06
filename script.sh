@@ -7,4 +7,4 @@
 
 module load python
 
-python simulate_ode_1d.py
+python simulate_pde_2d.py

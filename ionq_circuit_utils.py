@@ -551,3 +551,79 @@ def state_prep_one_hot_aux(n, starting_index, amplitudes):
             instructions += state_prep_one_hot_aux(int((n+1)/2), starting_index + int(n/2), amplitudes_right / np.linalg.norm(amplitudes_right))
 
     return instructions
+
+def save_as_native_circuit(filename, qiskit_circuit):
+    '''Saves Qiskit circuit as QASM circuit'''
+    assert ".qasm" in filename
+    num_qubits = qiskit_circuit.num_qubits
+    one_qubit_gates, two_qubit_gates =  0, 0
+    print(f"Saving file as {filename}.")
+
+    with open(filename, "w") as f:
+        f.write("OPENQASM 2.0;\n")
+        f.write('''include "qelib1.inc";\n''')
+        f.write(f"qreg q[{num_qubits}];\n")
+
+        for item in qiskit_circuit.data:
+            instruction, qubits = item[0], item[1]
+            theta = instruction.params[0] % (2 * np.pi)
+            turns = (theta / (2 * np.pi)) % 1
+            # compute 2 * turns and center at at zero
+            if turns < 0.5:
+                twice_turns = turns * 2
+            else:
+                twice_turns = -1 + ((2 * turns) % 1)
+
+            if instruction.name == "rz":
+                q = int(qiskit_circuit.find_bit(qubits[0]).index)
+                if abs(theta) > 1e-5:
+                    f.write(f"rz({twice_turns}*pi) q[{q}];\n")
+
+            elif instruction.name == "rx":
+                q = int(qiskit_circuit.find_bit(qubits[0]).index)
+                if abs(theta) > 1e-5:
+                    if abs(turns - 0.25) < 1e-6:
+                        f.write(f"gpi2(0.0*pi) q[{q}];\n")
+                    elif abs(turns + 0.25) < 1e-6:
+                        f.write(f"gpi2(1.0*pi) q[{q}];\n")
+                    elif abs(turns - 0.5) < 1e-6:
+                        f.write(f"gpi(0.0*pi) q[{q}];\n")
+                    elif abs(turns + 0.5) < 1e-6:
+                        f.write(f"gpi(1.0*pi) q[{q}];\n")
+                    else:
+                        f.write(f"gpi2(-0.5*pi) q[{q}];\n")
+                        f.write(f"rz({twice_turns}*pi) q[{q}];\n")
+                        f.write(f"gpi2(0.5*pi) q[{q}];\n")
+                        one_qubit_gates += 1
+                    one_qubit_gates += 1
+
+            elif instruction.name == "ry":
+                q = int(qiskit_circuit.find_bit(qubits[0]).index)
+                if abs(theta) > 1e-5:
+                    if abs(turns - 0.25) < 1e-6:
+                        f.write(f"gpi2(0.5*pi) q[{q}];\n")
+                    elif abs(turns + 0.25) < 1e-6:
+                        f.write(f"gpi2(-0.5*pi) q[{q}];\n")
+                    elif abs(turns - 0.5) < 1e-6:
+                        f.write(f"gpi(0.5*pi) q[{q}];\n")
+                    elif abs(turns + 0.5) < 1e-6:
+                        f.write(f"gpi(-0.5*pi) q[{q}];\n")
+                    else:
+                        f.write(f"gpi2(0.0*pi) q[{q}];\n")
+                        f.write(f"rz({twice_turns}*pi) q[{q}];\n")
+                        f.write(f"gpi2(1.0*pi) q[{q}];\n")
+                        one_qubit_gates += 1
+                    one_qubit_gates += 1
+
+            elif instruction.name == "rxx":
+                q0 = int(qiskit_circuit.find_bit(qubits[0]).index)
+                q1 = int(qiskit_circuit.find_bit(qubits[1]).index)
+                if abs(theta) > 1e-5:
+                    f.write(f"rxx({twice_turns}*pi) q[{q0}], q[{q1}];\n")
+                    two_qubit_gates += 1
+            else:
+                raise TypeError(f"Gate is {instruction.name}, not Rx, Ry, Rz, XX")
+            
+    f.close()
+    print(f"1q: {one_qubit_gates}, 2q: {two_qubit_gates}")
+    
