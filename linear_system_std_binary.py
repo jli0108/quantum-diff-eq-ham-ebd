@@ -11,9 +11,9 @@ from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.circuit.library import QFT
 
 
-def schrodingerization(A, u_0, N, L, R, T, N_t, lambda_min, r=None):
+def schrodingerization(A, u_0, N, R, T, N_t, lambda_min, r=None):
     dimension = u_0.shape[0]
-    h = (R - L) / (N - 1)
+    h = (2 * R) / (N - 1)
     # Convert ODE to PDE
     H1 = (A + np.conj(A).T) / 2
     print("Eigvals of H1:", eigvalsh(H1.toarray()))
@@ -22,7 +22,7 @@ def schrodingerization(A, u_0, N, L, R, T, N_t, lambda_min, r=None):
     # print("H1:", H1.toarray())
     # print("H2:", H2.toarray())
 
-    p_vals = np.linspace(L, R, N)
+    p_vals = np.linspace(-R, R, N)
     v_0 = kron(u_0, np.exp(-np.abs(p_vals))).toarray().flatten() # second axis is for p
     # Write out the Hamiltonian
     # centered differences
@@ -36,15 +36,15 @@ def schrodingerization(A, u_0, N, L, R, T, N_t, lambda_min, r=None):
     u_recover = np.zeros((N_t, dimension))
     for i, t in enumerate(np.linspace(0, T, N_t)):
         a = -lambda_min * t
-        a_idx = int((a - L) / h)
+        a_idx = N // 2 + int(a / h)
         # u_recover[i] = np.exp(a) * np.sum(np.reshape(v, newshape=(N_t, dimension, N))[i,:,a_idx:], axis=1) * h
         u_recover[i] = np.exp(a) * np.sum(np.reshape(np.abs(v), newshape=(N_t, dimension, N))[i,:,a_idx:], axis=1) * h
     
     return u_recover
 
-def schrodingerization_ft(A, u_0, N, L, R, T, N_t, lambda_min, r=None):
+def schrodingerization_ft(A, u_0, N, R, T, N_t, lambda_min, r=None):
     dimension = u_0.shape[0]
-    h = (R - L) / (N - 1)
+    h = (2 * R) / (N - 1)
     # Convert ODE to PDE
     H1 = (A + np.conj(A).T) / 2
     print("Eigvals of H1:", eigvalsh(H1.toarray()))
@@ -52,11 +52,11 @@ def schrodingerization_ft(A, u_0, N, L, R, T, N_t, lambda_min, r=None):
     H2 = (A - np.conj(A).T) / 2j
     # print("H1:", H1.toarray())
     # print("H2:", H2.toarray())
-    p = np.linspace(L, R, N)
+    p = np.linspace(-R, R, N)
     v_0 = kron(u_0, np.fft.fft(np.exp(-np.abs(p)), norm="ortho")).toarray().flatten() # second axis is for p
     # v_0 = kron(u_0, np.sqrt(2 / np.pi) / (xi ** 2 + 1)).toarray().flatten() # second axis is for p
     # Write out the Hamiltonian
-    H = - (kron(H1, -diags(np.fft.fftfreq(N, d = 1/(N * 2 * np.pi / (R - L))))) + kron(H2, eye(N)))
+    H = - (kron(H1, -diags(np.fft.fftfreq(N, d = 1/(N * 2 * np.pi / (2 * R))))) + kron(H2, eye(N)))
     print(H.shape)
     # Solve the PDE
     v = expm_multiply(-1j * H, v_0, start=0, stop=T, num=N_t)
@@ -68,18 +68,18 @@ def schrodingerization_ft(A, u_0, N, L, R, T, N_t, lambda_min, r=None):
     u_recover = np.zeros((N_t, dimension))
     for i, t in enumerate(np.linspace(0, T, N_t)):
         a = -lambda_min * t
-        a_idx = int((a - L) / h)
+        a_idx = N // 2 + int(a / h)
         # u_recover[i] = np.exp(a) * np.sum(np.reshape(v, newshape=(N_t, dimension, N))[i,:,a_idx:], axis=1) * h
         u_recover[i] = np.exp(a) * np.sum(np.reshape(np.abs(v), newshape=(N_t, dimension, N))[i,:,a_idx:], axis=1) * h
     
 
     return u_recover
 
-def schrodingerization_ft_trot(A, u_0, N, L, R, T, N_t, lambda_min, r):
+def schrodingerization_ft_trot(A, u_0, N, R, T, N_t, lambda_min, r):
     assert type(r) == int and r >= 1
     dimension = u_0.shape[0]
     n_p = int(np.log2(N))
-    h = (R - L) / (N - 1)
+    h = (2 * R) / (N - 1)
     # Convert ODE to PDE
     H1 = (A + np.conj(A).T) / 2
     print("Eigvals of H1:", eigvalsh(H1.toarray()))
@@ -87,13 +87,13 @@ def schrodingerization_ft_trot(A, u_0, N, L, R, T, N_t, lambda_min, r):
     H2 = (A - np.conj(A).T) / 2j
     # print("H1:", H1.toarray())
     # print("H2:", H2.toarray())
-    p = np.linspace(L, R, N, dtype=np.complex128)
+    p = np.linspace(-R, R, N, dtype=np.complex128)
     v_0 = kron(u_0, np.fft.fft(np.exp(-np.abs(p)), norm="ortho")).toarray().flatten() # second axis is for p
     # v_0 = kron(u_0, np.sqrt(2 / np.pi) / (xi ** 2 + 1)).toarray().flatten() # second axis is for p
     # Write out the Hamiltonian
-    H = - (kron(H1, -diags(np.fft.fftfreq(N, d = 1/(N * 2 * np.pi / (R - L))))) + kron(H2, eye(N)))
+    H = - (kron(H1, -diags(np.fft.fftfreq(N, d = 1/(N * 2 * np.pi / (2 * R))))) + kron(H2, eye(N)))
     H1_pauli_list = SparsePauliOp.from_operator(H1.toarray()).to_list()
-    xi_pauli_list = SparsePauliOp.from_operator(-diags(np.fft.fftfreq(N, d = 1/(N * 2 * np.pi / (R - L)))).toarray()).to_list()
+    xi_pauli_list = SparsePauliOp.from_operator(-diags(np.fft.fftfreq(N, d = 1/(N * 2 * np.pi / (2 * R)))).toarray()).to_list()
     H2_pauli_list = SparsePauliOp.from_operator(H2.toarray()).to_list()
 
     pauli_list = []
@@ -130,14 +130,14 @@ def schrodingerization_ft_trot(A, u_0, N, L, R, T, N_t, lambda_min, r):
     u_recover = np.zeros((N_t, dimension))
     for i, t in enumerate(np.linspace(0, T, N_t)):
         a = -lambda_min * t
-        a_idx = int((a - L) / h)
+        a_idx = N // 2 + int(a / h)
         # u_recover[i] = np.exp(a) * np.sum(np.reshape(v, newshape=(N_t, dimension, N))[i,:,a_idx:], axis=1) * h
         # print(np.reshape(np.abs(v), newshape=(N_t, dimension, N))[i,:,a_idx:])
         u_recover[i] = np.exp(a) * np.sum(np.reshape(np.abs(v), newshape=(N_t, dimension, N))[i,:,a_idx:], axis=1) * h
     
     return u_recover
 
-def solve_gradient_flow(A, b, x_0, N, L, R, T, N_t, schrodingerization_method, r=None):
+def solve_gradient_flow(A, b, x_0, N, R, T, N_t, schrodingerization_method, r=None):
     # The gradient of the optimization problem is Ax-b, so the gradient flow ODE is x'(t) = - Ax + b.
     A_tilde = vstack([hstack([A, -b]), csc_matrix((1, A.shape[0]+1))])
     # print(A_tilde.toarray())
@@ -145,10 +145,10 @@ def solve_gradient_flow(A, b, x_0, N, L, R, T, N_t, schrodingerization_method, r
 
     lambda_min = np.min(eigvalsh((A_tilde + A_tilde.T).toarray() / 2))
     print("Min eval:", lambda_min)
-    u_recover = schrodingerization_method(-A_tilde, vstack([x_0, 1]), N, L, R, T, N_t, lambda_min=-norm(b)/2, r=r)
+    u_recover = schrodingerization_method(-A_tilde, vstack([x_0, 1]), N, R, T, N_t, lambda_min=-norm(b)/2, r=r)
     return u_recover[:,:-1]
 
-def get_xi_pauli_op(n_p, L, R):
+def get_xi_pauli_op(n_p, R):
     xi_pauli_list = []
     op = n_p * ['I']
     xi_pauli_list.append((''.join(op), 1))
@@ -162,7 +162,7 @@ def get_xi_pauli_op(n_p, L, R):
     op[0] = 'Z'
     xi_pauli_list.append((''.join(op), - 2 ** (n_p - 1)))
 
-    xi_pauli_op = 0.5 * (2 * np.pi / (R - L)) * SparsePauliOp.from_list(xi_pauli_list)
+    xi_pauli_op = 0.5 * (2 * np.pi / (2 * R)) * SparsePauliOp.from_list(xi_pauli_list)
     return xi_pauli_op
 
 def get_pauli_weight(pauli_str):
@@ -237,9 +237,9 @@ def get_pauli_rotation(pauli_str, coeff):
         case _:
             raise ValueError("Only implemented for locality up to 2")
     
-def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, L, R):
+def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R):
     N_p = 2 ** n_p
-    p = np.linspace(L, R, N_p)
+    p = np.linspace(-R, R, N_p)
 
     amplitude_vector_left = np.exp(-np.abs(p))[:2**(n_p - 1)]
     amplitude_vector_left /= np.linalg.norm(amplitude_vector_left)
@@ -253,7 +253,7 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, L, R):
 
     state_prep_circuit.append(QFT(n_p).inverse(), qargs=list(range(n_p)))
 
-    xi_pauli_list = get_xi_pauli_op(n_p, L, R).to_list()
+    xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
     H_2_pauli_list = SparsePauliOp.from_operator(H_2.toarray()).to_list()
     # print(H_1_pauli_list)
@@ -283,9 +283,9 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, L, R):
 
     return full_circuit
 
-def get_full_circuit(n_x, n_p, t, H_1, H_2, r, L, R):
+def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R):
     N_p = 2 ** n_p
-    h = (R - L) / (N_p - 1)
+    h = (2 * R) / (N_p - 1)
 
     state_prep_circuit = QuantumCircuit(n_p)
     for i in range(n_p-1):
@@ -299,7 +299,7 @@ def get_full_circuit(n_x, n_p, t, H_1, H_2, r, L, R):
 
     state_prep_circuit.append(QFT(n_p).inverse(), qargs=list(range(n_p)))
 
-    xi_pauli_list = get_xi_pauli_op(n_p, L, R).to_list()
+    xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
     H_2_pauli_list = SparsePauliOp.from_operator(H_2.toarray()).to_list()
     # print(H_1_pauli_list)
