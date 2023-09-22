@@ -237,6 +237,28 @@ def get_pauli_rotation(pauli_str, coeff):
         case _:
             raise ValueError("Only implemented for locality up to 2")
     
+def get_qft(n_p):
+    # Returns QFT circuit
+    # Decompose QFT so two-qubit gates are XX rotations
+    qft_circuit = QuantumCircuit(n_p)
+    for i in np.arange(n_p)[::-1]:
+        # myqft.ry(-np.pi/4, n_p - 1 - i)
+        # myqft.rz(np.pi, n_p - 1 - i)
+        qft_circuit.h(i)
+        for j in range(i):
+            theta = np.pi / (2 ** (j + 1))
+            # Controlled phase gate
+            qft_circuit.rz(theta / 2, i)
+            qft_circuit.rz(theta / 2, i - 1 - j)
+            qft_circuit.h(i)
+            qft_circuit.h(i - 1 - j)
+            qft_circuit.rxx(-theta / 2, i, i - 1 - j)
+            qft_circuit.h(i)
+            qft_circuit.h(i - 1 - j)
+    for i in range(n_p // 2):
+        qft_circuit.swap(i, n_p - 1 - i)
+    return qft_circuit
+
 def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R):
     N_p = 2 ** n_p
     p = np.linspace(-R, R, N_p)
@@ -251,7 +273,7 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R):
     for i in range(n_p-1):
         state_prep_circuit.cnot(n_p - 1, i)
 
-    state_prep_circuit.append(QFT(n_p).inverse(), qargs=list(range(n_p)))
+    state_prep_circuit.append(get_qft(n_p).inverse(), qargs=list(range(n_p)))
 
     xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
@@ -279,7 +301,7 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R):
         full_circuit.x(i)
 
     full_circuit.append(trot_circuit, qargs=range(n_p+n_x))
-    full_circuit.append(QFT(n_p), qargs=range(n_p))
+    full_circuit.append(get_qft(n_p), qargs=range(n_p))
 
     return full_circuit
 
@@ -297,7 +319,7 @@ def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R):
         state_prep_circuit.cnot(n_p - 1, i)
     state_prep_circuit.x(n_p - 1)
 
-    state_prep_circuit.append(QFT(n_p).inverse(), qargs=list(range(n_p)))
+    state_prep_circuit.append(get_qft(n_p).inverse(), qargs=list(range(n_p)))
 
     xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
@@ -360,6 +382,6 @@ def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R):
         full_circuit.x(i)
 
     full_circuit.append(trot_circuit, qargs=range(n_p+n_x))
-    full_circuit.append(QFT(n_p), qargs=range(n_p))
+    full_circuit.append(get_qft(n_p), qargs=range(n_p))
 
     return full_circuit
