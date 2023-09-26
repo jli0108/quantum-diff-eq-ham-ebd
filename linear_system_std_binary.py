@@ -106,7 +106,7 @@ def schrodingerization_ft_trot(A, u_0, N, R, T, N_t, lambda_min, r):
     pauli_op_commuting = pauli_op.simplify().group_commuting()
     print(f"Norm of diff: {np.linalg.norm(pauli_op.to_matrix() - H.toarray()) : 0.2f}")
 
-    # Hamiltonian simulation
+    # Hamiltonian simulation (second order Trotter)
     t_vals = np.linspace(0, T, N_t)
     v = []
     for t in t_vals:
@@ -305,7 +305,7 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R):
 
     return full_circuit
 
-def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R):
+def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R, trotter_method="second_order"):
     N_p = 2 ** n_p
     h = (2 * R) / (N_p - 1)
 
@@ -352,28 +352,73 @@ def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R):
     
     # First-order Trotter
     for _ in range(r):
-        for pauli_str, coeff in pauli_list_1:
-            trot_circuit.append(get_pauli_rotation(pauli_str, dt * coeff.real), qargs=list(range(n_p+n_x)))
+        if trotter_method == "first_order":
+            for pauli_str, coeff in pauli_list_1:
+                trot_circuit.append(get_pauli_rotation(pauli_str, dt * coeff.real), qargs=list(range(n_p+n_x)))
 
-        for pauli_str, coeff in pauli_list_2:
-            trot_circuit.append(get_pauli_rotation(pauli_str, dt * coeff.real), qargs=list(range(n_p+n_x)))
+            for pauli_str, coeff in pauli_list_2:
+                trot_circuit.append(get_pauli_rotation(pauli_str, dt * coeff.real), qargs=list(range(n_p+n_x)))
 
-        # Hadamard on p register
-        for i in range(n_p):
-            trot_circuit.h(i)
-        for i in range(n_p):
-            for j in range(n_x):
-                assert np.count_nonzero(two_qubit_pauli_coeffs[i,j]) == 2
-                x, y, z = two_qubit_pauli_coeffs[i,j]
-                assert np.abs(y) < 1e-6
-                norm = np.linalg.norm(two_qubit_pauli_coeffs[i,j])
-                phi = np.arctan2(z, x)
-                trot_circuit.ry(phi, n_p + j)
-                trot_circuit.rxx(2 * norm * dt, i, n_p + j)
-                trot_circuit.ry(-phi, n_p + j)
-        # Hadamard on p register
-        for i in range(n_p):
-            trot_circuit.h(i)
+            # Hadamard on p register
+            for i in range(n_p):
+                trot_circuit.h(i)
+            for i in range(n_p):
+                for j in range(n_x):
+                    assert np.count_nonzero(two_qubit_pauli_coeffs[i,j]) == 2
+                    x, y, z = two_qubit_pauli_coeffs[i,j]
+                    assert np.abs(y) < 1e-6
+                    norm = np.linalg.norm(two_qubit_pauli_coeffs[i,j])
+                    phi = np.arctan2(z, x)
+                    trot_circuit.ry(phi, n_p + j)
+                    trot_circuit.rxx(2 * norm * dt, i, n_p + j)
+                    trot_circuit.ry(-phi, n_p + j)
+            # Hadamard on p register
+            for i in range(n_p):
+                trot_circuit.h(i)
+
+        elif trotter_method == "second_order":
+            for pauli_str, coeff in pauli_list_1:
+                trot_circuit.append(get_pauli_rotation(pauli_str, 0.5 * dt * coeff.real), qargs=list(range(n_p+n_x)))
+
+            for pauli_str, coeff in pauli_list_2:
+                trot_circuit.append(get_pauli_rotation(pauli_str, 0.5 * dt * coeff.real), qargs=list(range(n_p+n_x)))
+
+            # Hadamard on p register
+            for i in range(n_p):
+                trot_circuit.h(i)
+            for i in range(n_p):
+                for j in range(n_x):
+                    assert np.count_nonzero(two_qubit_pauli_coeffs[i,j]) == 2
+                    x, y, z = two_qubit_pauli_coeffs[i,j]
+                    assert np.abs(y) < 1e-6
+                    norm = np.linalg.norm(two_qubit_pauli_coeffs[i,j])
+                    phi = np.arctan2(z, x)
+                    trot_circuit.ry(phi, n_p + j)
+                    trot_circuit.rxx(2 * norm * dt * 0.5, i, n_p + j)
+                    trot_circuit.ry(-phi, n_p + j)
+
+            for i in range(n_p)[::-1]:
+                for j in range(n_x)[::-1]:
+                    assert np.count_nonzero(two_qubit_pauli_coeffs[i,j]) == 2
+                    x, y, z = two_qubit_pauli_coeffs[i,j]
+                    assert np.abs(y) < 1e-6
+                    norm = np.linalg.norm(two_qubit_pauli_coeffs[i,j])
+                    phi = np.arctan2(z, x)
+                    trot_circuit.ry(phi, n_p + j)
+                    trot_circuit.rxx(2 * norm * dt * 0.5, i, n_p + j)
+                    trot_circuit.ry(-phi, n_p + j)
+            # Hadamard on p register
+            for i in range(n_p):
+                trot_circuit.h(i)
+
+            for pauli_str, coeff in pauli_list_2[::-1]:
+                trot_circuit.append(get_pauli_rotation(pauli_str, 0.5 * dt * coeff.real), qargs=list(range(n_p+n_x)))
+
+            for pauli_str, coeff in pauli_list_1[::-1]:
+                trot_circuit.append(get_pauli_rotation(pauli_str, 0.5 * dt * coeff.real), qargs=list(range(n_p+n_x)))
+
+        else:
+            raise ValueError("Trotter method not implemented.")
 
     full_circuit = QuantumCircuit(n_p + n_x)
     full_circuit.append(state_prep_circuit, qargs=range(n_p))
