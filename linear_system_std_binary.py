@@ -237,7 +237,7 @@ def get_pauli_rotation(pauli_str, coeff):
         case _:
             raise ValueError("Only implemented for locality up to 2")
     
-def get_qft(n_p):
+def get_qft(n_p, approx_degree=0):
     # Returns QFT circuit
     # Decompose QFT so two-qubit gates are XX rotations
     qft_circuit = QuantumCircuit(n_p)
@@ -246,20 +246,21 @@ def get_qft(n_p):
         # myqft.rz(np.pi, n_p - 1 - i)
         qft_circuit.h(i)
         for j in range(i):
-            theta = np.pi / (2 ** (j + 1))
-            # Controlled phase gate
-            qft_circuit.rz(theta / 2, i)
-            qft_circuit.rz(theta / 2, i - 1 - j)
-            qft_circuit.h(i)
-            qft_circuit.h(i - 1 - j)
-            qft_circuit.rxx(-theta / 2, i, i - 1 - j)
-            qft_circuit.h(i)
-            qft_circuit.h(i - 1 - j)
+            if j < n_p - 1 - approx_degree:
+                theta = np.pi / (2 ** (j + 1))
+                # Controlled phase gate
+                qft_circuit.rz(theta / 2, i)
+                qft_circuit.rz(theta / 2, i - 1 - j)
+                qft_circuit.h(i)
+                qft_circuit.h(i - 1 - j)
+                qft_circuit.rxx(-theta / 2, i, i - 1 - j)
+                qft_circuit.h(i)
+                qft_circuit.h(i - 1 - j)
     for i in range(n_p // 2):
         qft_circuit.swap(i, n_p - 1 - i)
     return qft_circuit
 
-def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R):
+def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R, qft_approx_degree=0):
     N_p = 2 ** n_p
     p = np.linspace(-R, R, N_p)
 
@@ -273,7 +274,7 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R):
     for i in range(n_p-1):
         state_prep_circuit.cnot(n_p - 1, i)
 
-    state_prep_circuit.append(get_qft(n_p).inverse(), qargs=list(range(n_p)))
+    state_prep_circuit.append(get_qft(n_p, approx_degree=qft_approx_degree).inverse(), qargs=list(range(n_p)))
 
     xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
@@ -301,11 +302,11 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R):
         full_circuit.x(i)
 
     full_circuit.append(trot_circuit, qargs=range(n_p+n_x))
-    full_circuit.append(get_qft(n_p), qargs=range(n_p))
+    full_circuit.append(get_qft(n_p, approx_degree=qft_approx_degree), qargs=range(n_p))
 
     return full_circuit
 
-def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R, trotter_method="second_order"):
+def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R, trotter_method="second_order", qft_approx_degree=0):
     N_p = 2 ** n_p
     h = (2 * R) / (N_p - 1)
 
@@ -319,7 +320,7 @@ def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R, trotter_method="second_order")
         state_prep_circuit.cnot(n_p - 1, i)
     state_prep_circuit.x(n_p - 1)
 
-    state_prep_circuit.append(get_qft(n_p).inverse(), qargs=list(range(n_p)))
+    state_prep_circuit.append(get_qft(n_p, approx_degree=qft_approx_degree).inverse(), qargs=list(range(n_p)))
 
     xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
@@ -427,6 +428,42 @@ def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R, trotter_method="second_order")
         full_circuit.x(i)
 
     full_circuit.append(trot_circuit, qargs=range(n_p+n_x))
-    full_circuit.append(get_qft(n_p), qargs=range(n_p))
+    full_circuit.append(get_qft(n_p, approx_degree=qft_approx_degree), qargs=range(n_p))
 
     return full_circuit
+
+def process_swaps(qiskit_circuit):
+    '''Moves SWAP to back of circuit'''
+    num_qubits = qiskit_circuit.num_qubits
+    current_permutation = list(range(num_qubits))
+    new_circuit = QuantumCircuit(num_qubits)
+    for item in qiskit_circuit.data:
+        instruction, qubits = item[0], item[1]
+        if instruction.name == "swap":
+            q0 = int(qiskit_circuit.find_bit(qubits[0]).index)
+            q1 = int(qiskit_circuit.find_bit(qubits[1]).index)
+            # SWAP 
+            current_permutation[q0] += current_permutation[q1]
+            current_permutation[q1] = current_permutation[q0] - current_permutation[q1]
+            current_permutation[q0] -= current_permutation[q1]
+        elif instruction.name == "rz":
+            q = int(qiskit_circuit.find_bit(qubits[0]).index)
+            theta = instruction.params[0]
+            new_circuit.rz(theta, current_permutation[q])
+        elif instruction.name == "rx":
+            q = int(qiskit_circuit.find_bit(qubits[0]).index)
+            theta = instruction.params[0]
+            new_circuit.rx(theta, current_permutation[q])
+        elif instruction.name == "ry":
+            q = int(qiskit_circuit.find_bit(qubits[0]).index)
+            theta = instruction.params[0]
+            new_circuit.ry(theta, current_permutation[q])
+
+        elif instruction.name == "rxx":
+            q0 = int(qiskit_circuit.find_bit(qubits[0]).index)
+            q1 = int(qiskit_circuit.find_bit(qubits[1]).index)
+            theta = instruction.params[0]
+            new_circuit.rxx(theta, current_permutation[q0], current_permutation[q1])
+        else:
+            raise ValueError("Expected 1 or 2-qubit gates")
+    return new_circuit, current_permutation
