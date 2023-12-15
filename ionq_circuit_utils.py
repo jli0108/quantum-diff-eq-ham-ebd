@@ -150,6 +150,7 @@ def get_native_circuit(num_qubits, instructions):
 
                 
             case "rz":
+                print(op["target"])
                 qubit_phase[op["target"]] -= op["rotation"] / (2 * np.pi)
                 qubit_phase[op["target"]] %= 1
 
@@ -525,7 +526,7 @@ def state_prep_circuit(N, dimension, amplitudes, encoding):
             if not np.all(amplitudes >= 0):
                 for k in range(N):
                     theta = np.angle(amplitudes[k])
-                    instructions.append(get_rz(i * n + k, theta))
+                    instructions.append(get_rz(theta, i * n + k))
 
         elif encoding == "one-cold":
             amplitudes_abs_val = np.abs(amplitudes)
@@ -538,7 +539,7 @@ def state_prep_circuit(N, dimension, amplitudes, encoding):
             if not np.all(amplitudes >= 0):
                 for k in range(N):
                     theta = np.angle(amplitudes[k])
-                    instructions.append(get_rz(i * n + k, theta))
+                    instructions.append(get_rz(theta, i * n + k))
             # Flip all bits
             for k in range(N):
                 instructions.append(get_rx(np.pi, i * n + k))
