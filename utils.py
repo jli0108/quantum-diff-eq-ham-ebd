@@ -228,6 +228,15 @@ def get_codewords_1d(n : int, encoding, periodic):
             if i < n - 1:
                 bitstring ^= (1 << i)
                 bitstring ^= (1 << (i+1))
+    elif encoding == "one-cold":
+        bitstring = 1
+
+        for i in range(n):
+            codewords.append(2 ** n - 1 - bitstring)
+
+            if i < n - 1:
+                bitstring ^= (1 << i)
+                bitstring ^= (1 << (i+1))
     return codewords
 
 def get_codewords(N : int, dimension: int, encoding, periodic=False):
@@ -257,7 +266,7 @@ def get_codewords(N : int, dimension: int, encoding, periodic=False):
     return codewords
 
 def num_qubits_per_dim(N, encoding):
-    if encoding == "one-hot":
+    if encoding == "one-hot" or encoding == "one-cold":
         return N
     elif encoding == "unary" or encoding == "antiferromagnetic":
         return N - 1
@@ -300,6 +309,17 @@ def get_bitstrings_1d(N, encoding):
             bitstring[i] = "1"
             if i > 0:
                 bitstring[i-1] = "0"
+
+            bitstrings.append("".join(bitstring))
+
+        return bitstrings
+
+    elif encoding == "one-cold":
+        bitstring = N * ["1"]
+        for i in range(N):
+            bitstring[i] = "0"
+            if i > 0:
+                bitstring[i-1] = "1"
 
             bitstrings.append("".join(bitstring))
 
