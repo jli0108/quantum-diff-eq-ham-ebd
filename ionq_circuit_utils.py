@@ -150,7 +150,6 @@ def get_native_circuit(num_qubits, instructions):
 
                 
             case "rz":
-                print(op["target"])
                 qubit_phase[op["target"]] -= op["rotation"] / (2 * np.pi)
                 qubit_phase[op["target"]] %= 1
 
