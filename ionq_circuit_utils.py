@@ -295,6 +295,9 @@ def get_qiskit_circuit(num_qubits, instructions):
     for op in instructions:
         if op["gate"] == "h":
             circuit.h(op["target"])
+
+        elif op["gate"] == "cnot":
+            circuit.cnot(op["control"], op["target"])
             
         elif op["gate"] == "rz":
             circuit.rz(op["rotation"], op["target"])
@@ -317,8 +320,14 @@ def get_qiskit_circuit(num_qubits, instructions):
         elif op["gate"] == "zz":
             if np.abs(op["rotation"]) > 1e-5:
                 circuit.rzz(op["rotation"], op["targets"][0], op["targets"][1])
+        
+        elif op["gate"] == "xy":
+            if np.abs(op["rotation"]) > 1e-5:
+                circuit.rz(-np.pi/2, op["targets"][1])
+                circuit.rxx(op["rotation"], op["targets"][0], op["targets"][1])
+                circuit.rz(+np.pi/2, op["targets"][1])
         else:
-            raise TypeError(f"Gate is {op['''gate''']}, not H, Rx, Ry, Rz, XX, YY, ZZ")
+            raise TypeError(f"Gate is {op['''gate''']}, not H, CNOT, Rx, Ry, Rz, XX, YY, ZZ")
 
 
     return circuit
