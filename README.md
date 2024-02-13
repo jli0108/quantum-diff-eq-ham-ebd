@@ -1,3 +1,3 @@
-# pde-project
+# Quantum simulation of differential equations
 
-Project for solving PDEs on quantum computers.
+Project for solving differential equations using quantum computers.
