@@ -2,6 +2,88 @@ import numpy as np
 from braket.circuits import Circuit
 from qiskit import QuantumCircuit
 from utils import num_qubits_per_dim
+import requests
+import json
+from os import getenv
+from dotenv import load_dotenv
+
+load_dotenv()
+IONQ_API_KEY = getenv('IONQ_API_KEY')
+
+# Sends job and returns job_id
+def send_job(job):
+    headers = {
+        "Authorization": f"apiKey {IONQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    req = requests.post("https://api.ionq.co/v0.3/jobs", json=job, headers=headers)
+    try:
+        job_id = json.loads(req.content)['id']
+    except KeyError:
+        print(req.content)
+        raise KeyError(f"Error sending job. Error message: {req.content['''message''']}")
+    return job_id
+
+def get_ionq_job_json(name, num_qubits, shots, device, instructions, use_native_gates=True, noisy_simulator=False):
+    job = {}
+    job["lang"] = "json"
+    job["name"] = name
+    job["shots"] = shots
+    job["target"] = device
+
+    input = {}
+    input["format"] = "ionq.circuit.v0"
+
+    input["qubits"] = num_qubits
+    
+    if use_native_gates:
+        input["gateset"] = "native"
+        native_instructions, _ = get_native_circuit(num_qubits, instructions)
+        input["circuit"] = native_instructions
+    else:
+        input["gateset"] = "qis"
+        input["circuit"] = instructions
+
+    job["input"] = input
+
+    if noisy_simulator:
+        assert device == "simulator"
+        job["noise"] = {"model": "aria-1"}
+    
+    return job
+
+def cancel_job(job_id):
+    print("Cancelling job:", job_id)
+
+    headers = {
+        "Authorization": f"apiKey {IONQ_API_KEY}"
+    }
+    r = requests.put(f"https://api.ionq.co/v0.3/jobs/{job_id}/status/cancel", headers=headers)
+    return r
+
+def get_ionq_single_job_result(job_id):
+
+    print("Getting job:", job_id)
+
+    headers = {
+        "Authorization": f"apiKey {IONQ_API_KEY}"
+    }
+
+    req = requests.get(f"https://api.ionq.co/v0.3/jobs/{job_id}", headers=headers)
+
+    status = json.loads(req.content)['status']
+    print(f"Job status: {status}")
+    if status == "completed":
+        headers = {
+            "Authorization": f"apiKey {IONQ_API_KEY}"
+        }
+        params = {"sharpen": "false"}
+        req = requests.get(f"https://api.ionq.co/v0.3/jobs/{job_id}/results", headers=headers, params=params)
+        results = json.loads(req.content)
+    
+        return results
+    else:
+        raise Exception(f"Job not completed, status is {status}")
 
 def get_hadamard(target):
     return {
@@ -148,7 +230,6 @@ def get_native_circuit(num_qubits, instructions):
                 # Rx on target
                 op_list.append(get_gpi2((qubit_phase[op["target"]] + 0) % 1, op["target"]))
 
-                
             case "rz":
                 qubit_phase[op["target"]] -= op["rotation"] / (2 * np.pi)
                 qubit_phase[op["target"]] %= 1
@@ -409,37 +490,6 @@ def get_braket_native_circuit(instructions):
     return circuit
 
 
-def get_ionq_job_json(name, N, dimension, shots, device, encoding, instructions, use_native_gates=True, noisy_simulator=False):
-    # assert use_native_gates == True
-    n = num_qubits_per_dim(N, encoding)
-    job = {}
-    job["lang"] = "json"
-    job["name"] = name
-    job["shots"] = shots
-    job["target"] = device
-
-    input = {}
-    input["format"] = "ionq.circuit.v0"
-
-    input["qubits"] = n * dimension
-    
-    if use_native_gates:
-        input["gateset"] = "native"
-        input["circuit"], _ = get_native_circuit(n * dimension, instructions)
-    else:
-        input["gateset"] = "qis"
-        input["circuit"] = instructions
-
-    job["input"] = input
-
-    if noisy_simulator:
-        assert device == "simulator"
-        job["noise"] = {"model": "aria-1"}
-    
-    return job
-
-
-
 # Old state preparation
 def state_prep_braket(N, dimension, amplitudes, encoding):
     n = num_qubits_per_dim(N, encoding)
@@ -493,7 +543,6 @@ def state_prep_braket(N, dimension, amplitudes, encoding):
     return circuit
 
 def state_prep_circuit(N, dimension, amplitudes, encoding):
-    
 
     n = num_qubits_per_dim(N, encoding)
     instructions = []
@@ -577,3 +626,79 @@ def state_prep_one_hot_aux(n, starting_index, amplitudes):
             instructions += state_prep_one_hot_aux(int((n+1)/2), starting_index + int(n/2), amplitudes_right / np.linalg.norm(amplitudes_right))
 
     return instructions
+
+def save_as_native_circuit(filename, qiskit_circuit):
+    '''Saves Qiskit circuit as QASM circuit'''
+    assert ".qasm" in filename
+    num_qubits = qiskit_circuit.num_qubits
+    one_qubit_gates, two_qubit_gates =  0, 0
+    print(f"Saving file as {filename}.")
+
+    with open(filename, "w") as f:
+        f.write("OPENQASM 2.0;\n")
+        f.write('''include "qelib1.inc";\n''')
+        f.write(f"qreg q[{num_qubits}];\n")
+
+        for item in qiskit_circuit.data:
+            instruction, qubits = item[0], item[1]
+            theta = instruction.params[0] % (2 * np.pi)
+            turns = (theta / (2 * np.pi)) % 1
+            # compute 2 * turns and center at at zero
+            if turns < 0.5:
+                twice_turns = turns * 2
+            else:
+                twice_turns = -1 + ((2 * turns) % 1)
+
+            if instruction.name == "rz":
+                q = int(qiskit_circuit.find_bit(qubits[0]).index)
+                if abs(theta) > 1e-5:
+                    f.write(f"rz({twice_turns}*pi) q[{q}];\n")
+
+            elif instruction.name == "rx":
+                q = int(qiskit_circuit.find_bit(qubits[0]).index)
+                if abs(theta) > 1e-5:
+                    if abs(turns - 0.25) < 1e-6:
+                        f.write(f"gpi2(0.0*pi) q[{q}];\n")
+                    elif abs(turns + 0.25) < 1e-6:
+                        f.write(f"gpi2(1.0*pi) q[{q}];\n")
+                    elif abs(turns - 0.5) < 1e-6:
+                        f.write(f"gpi(0.0*pi) q[{q}];\n")
+                    elif abs(turns + 0.5) < 1e-6:
+                        f.write(f"gpi(1.0*pi) q[{q}];\n")
+                    else:
+                        f.write(f"gpi2(-0.5*pi) q[{q}];\n")
+                        f.write(f"rz({twice_turns}*pi) q[{q}];\n")
+                        f.write(f"gpi2(0.5*pi) q[{q}];\n")
+                        one_qubit_gates += 1
+                    one_qubit_gates += 1
+
+            elif instruction.name == "ry":
+                q = int(qiskit_circuit.find_bit(qubits[0]).index)
+                if abs(theta) > 1e-5:
+                    if abs(turns - 0.25) < 1e-6:
+                        f.write(f"gpi2(0.5*pi) q[{q}];\n")
+                    elif abs(turns + 0.25) < 1e-6:
+                        f.write(f"gpi2(-0.5*pi) q[{q}];\n")
+                    elif abs(turns - 0.5) < 1e-6:
+                        f.write(f"gpi(0.5*pi) q[{q}];\n")
+                    elif abs(turns + 0.5) < 1e-6:
+                        f.write(f"gpi(-0.5*pi) q[{q}];\n")
+                    else:
+                        f.write(f"gpi2(0.0*pi) q[{q}];\n")
+                        f.write(f"rz({twice_turns}*pi) q[{q}];\n")
+                        f.write(f"gpi2(1.0*pi) q[{q}];\n")
+                        one_qubit_gates += 1
+                    one_qubit_gates += 1
+
+            elif instruction.name == "rxx":
+                q0 = int(qiskit_circuit.find_bit(qubits[0]).index)
+                q1 = int(qiskit_circuit.find_bit(qubits[1]).index)
+                if abs(theta) > 1e-5:
+                    f.write(f"rxx({twice_turns}*pi) q[{q0}], q[{q1}];\n")
+                    two_qubit_gates += 1
+            else:
+                raise TypeError(f"Gate is {instruction.name}, not Rx, Ry, Rz, XX")
+            
+    f.close()
+    print(f"1q: {one_qubit_gates}, 2q: {two_qubit_gates}")
+    

@@ -147,6 +147,40 @@ def sum_V_nn(n : int, V : np.ndarray) -> np.ndarray:
             
     return res
 
+def sum_J_xx(n : int, J : np.ndarray) -> np.ndarray:
+    '''
+    Returns `\sum_{i>j} J_{i,j} \sigma_x^{(i)} \sigma_x^{(j)}` where `\sigma_x^{(i)}` 
+    is the Pauli-x operator on the ith qubit.
+    '''
+    assert n > 0
+    assert J.shape == (n,n)
+
+    dims = [2 ** i for i in range(n)]
+
+    res = csc_matrix((2 ** n, 2 ** n))
+    for i in range(n):
+        for j in range(i):
+            res += (J[i,j] + J[j,i]) * tensor([identity(dims[n-i-1], format='csr'), PAULI_X, identity(dims[i-j-1], format='csr'), PAULI_X, identity(dims[j], format='csr')])
+            
+    return res
+
+def sum_J_yy(n : int, J : np.ndarray) -> np.ndarray:
+    '''
+    Returns `\sum_{i>j} J_{i,j} \sigma_y^{(i)} \sigma_y^{(j)}` where `\sigma_y^{(i)}` 
+    is the Pauli-y operator on the ith qubit.
+    '''
+    assert n > 0
+    assert J.shape == (n,n)
+
+    dims = [2 ** i for i in range(n)]
+
+    res = csc_matrix((2 ** n, 2 ** n))
+    for i in range(n):
+        for j in range(i):
+            res += (J[i,j] + J[j,i]) * tensor([identity(dims[n-i-1], format='csr'), PAULI_Y, identity(dims[i-j-1], format='csr'), PAULI_Y, identity(dims[j], format='csr')])
+            
+    return res
+
 def sum_J_zz(n : int, J : np.ndarray) -> np.ndarray:
     '''
     Returns `\sum_{i>j} J_{i,j} \sigma_z^{(i)} \sigma_z^{(j)}` where `\sigma_z^{(i)}` 
@@ -160,7 +194,7 @@ def sum_J_zz(n : int, J : np.ndarray) -> np.ndarray:
     res = csc_matrix((2 ** n, 2 ** n))
     for i in range(n):
         for j in range(i):
-            res += J[i,j] * tensor([identity(dims[n-i-1], format='csr'), PAULI_Z, identity(dims[i-j-1], format='csr'), PAULI_Z, identity(dims[j], format='csr')])
+            res += (J[i,j] + J[j,i]) * tensor([identity(dims[n-i-1], format='csr'), PAULI_Z, identity(dims[i-j-1], format='csr'), PAULI_Z, identity(dims[j], format='csr')])
             
     return res
 
@@ -228,15 +262,6 @@ def get_codewords_1d(n : int, encoding, periodic):
             if i < n - 1:
                 bitstring ^= (1 << i)
                 bitstring ^= (1 << (i+1))
-    elif encoding == "one-cold":
-        bitstring = 1
-
-        for i in range(n):
-            codewords.append(2 ** n - 1 - bitstring)
-
-            if i < n - 1:
-                bitstring ^= (1 << i)
-                bitstring ^= (1 << (i+1))
     return codewords
 
 def get_codewords(N : int, dimension: int, encoding, periodic=False):
@@ -266,7 +291,7 @@ def get_codewords(N : int, dimension: int, encoding, periodic=False):
     return codewords
 
 def num_qubits_per_dim(N, encoding):
-    if encoding == "one-hot" or encoding == "one-cold":
+    if encoding == "one-hot":
         return N
     elif encoding == "unary" or encoding == "antiferromagnetic":
         return N - 1
@@ -309,17 +334,6 @@ def get_bitstrings_1d(N, encoding):
             bitstring[i] = "1"
             if i > 0:
                 bitstring[i-1] = "0"
-
-            bitstrings.append("".join(bitstring))
-
-        return bitstrings
-
-    elif encoding == "one-cold":
-        bitstring = N * ["1"]
-        for i in range(N):
-            bitstring[i] = "0"
-            if i > 0:
-                bitstring[i-1] = "1"
 
             bitstrings.append("".join(bitstring))
 
