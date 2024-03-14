@@ -9,7 +9,6 @@ from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.quantum_info import Operator
 
 from joblib import Parallel, delayed
-import networkx as nx
 import sys
 from os.path import join, dirname
 sys.path.append(join(dirname(__file__), "..", ".."))
@@ -172,80 +171,6 @@ def get_trotter_state_vector(N, amplitudes_list, trotterized_circuit, dimension,
 #     res = Parallel(n_jobs=num_jobs)(delayed(estimate_trotter_error_one_sample)(N, H_ebd, t, circuit, dimension, encoding, codewords, device) for _ in range(num_samples))
 #     return max(res)
 
-def get_one_hot_circuit(N, H, t, r, trotter_method):
-
-    H_terms, graph = get_H_terms_one_hot(N, H)
-
-    line_graph = nx.line_graph(graph)
-    coloring = nx.coloring.greedy_color(line_graph, strategy="independent_set")
-
-    coloring_grouped = {}
-    for edge in coloring.keys():
-        if coloring[edge] in coloring_grouped:
-            coloring_grouped[coloring[edge]].append(edge)
-        else:
-            coloring_grouped[coloring[edge]] = [edge]
-
-    num_colors = len(coloring_grouped.keys())
-
-    dt = t / r
-    circuit = Circuit()
-    if trotter_method == "first_order":
-        for _ in range(r):
-            for color in np.arange(0, num_colors):
-                edge_list = coloring_grouped[color]
-                for i,j in edge_list:
-                    circuit.xx(i, j, dt * H[i,j])
-                    circuit.yy(i, j, dt * H[i,j])
-            for i in range(N):
-                if np.abs(H[i,i]) > 1e-5:
-                    circuit.phaseshift(i, - dt * H[i,i])
-
-    elif trotter_method == "second_order":
-        for _ in range(r):
-            for color in np.arange(0, num_colors):
-                edge_list = coloring_grouped[color]
-                for i,j in edge_list:
-                    circuit.xx(i, j, dt * H[i,j] / 2)
-                    circuit.yy(i, j, dt * H[i,j] / 2)
-
-            for i in range(N):
-                if np.abs(H[i,i]) > 1e-5:
-                    circuit.phaseshift(i, - dt * H[i,i])
-
-            for color in np.arange(0, num_colors)[::-1]:
-                edge_list = coloring_grouped[color]
-                for i,j in edge_list:
-                    circuit.yy(i, j, dt * H[i,j] / 2)
-                    circuit.xx(i, j, dt * H[i,j] / 2)
-
-    elif trotter_method == "randomized_first_order":
-        np.random.seed(int(t * r))
-        for _ in range(r):
-            
-            if np.random.rand() < 0.5:
-                for color in np.arange(0, num_colors):
-                    edge_list = coloring_grouped[color]
-                    
-                    for i,j in edge_list:
-                        circuit.xx(i, j, dt * H[i,j])
-                        circuit.yy(i, j, dt * H[i,j])
-                for i in range(N):
-                    if np.abs(H[i,i]) > 1e-5:
-                        circuit.phaseshift(i, - dt * H[i,i])
-            else:
-                for i in range(N):
-                    if np.abs(H[i,i]) > 1e-5:
-                        circuit.phaseshift(i, - dt * H[i,i])
-                for color in np.arange(0, num_colors)[::-1]:
-                    edge_list = coloring_grouped[color]
-                    
-                    for i,j in edge_list:
-                        circuit.yy(i, j, dt * H[i,j])
-                        circuit.xx(i, j, dt * H[i,j])
-    else:
-        raise ValueError(f"{trotter_method} not supported")
-    return circuit
 
 def get_gate_counts(ops):
     num_single_qubit_gates = 0
@@ -390,41 +315,6 @@ def subspace_error(U1, U2, n, encoding):
         assert diff_subspace.shape == (n, n)
     
     return norm(diff_subspace, ord=2)
-
-def get_H_terms_one_hot(n, H):
-    '''Returns a list of (possibly noncommuting) Hamiltonian terms for one-hot encoding'''
-
-    graph = nx.Graph()
-    for i in range(n):
-        for j in range(i):
-            if H[i,j] != 0:
-                graph.add_edge(i,j)
-
-    line_graph = nx.line_graph(graph)
-    coloring = nx.coloring.greedy_color(line_graph, strategy="independent_set")
-
-    coloring_grouped = {}
-    for edge in coloring.keys():
-        if coloring[edge] in coloring_grouped:
-            coloring_grouped[coloring[edge]].append(edge)
-        else:
-            coloring_grouped[coloring[edge]] = [edge]
-
-    num_colors = len(coloring_grouped.keys())
-
-    H_terms = []
-    for color in np.arange(0, num_colors):
-        edge_list = coloring_grouped[color]
-        
-        A = np.zeros((n, n))
-        for i,j in edge_list:
-            A[i,j] = H[i,j]
-        
-        H_terms.append((sum_J_xx(n, A) + sum_J_yy(n, A)) / 2)
-    
-    H_terms.append(sum_delta_n(n, np.diag(H)))
-
-    return H_terms, graph
 
 def get_gate_counts(braket_circuit):
 
