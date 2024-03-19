@@ -276,7 +276,7 @@ if __name__ == "__main__":
 
         print("Trotter steps:", r_max)
         # Get the circuit (for 1D)
-        circuit = get_trotterized_circ_bell_basis(n, lamb, T, r, periodic)
+        circuit = get_trotterized_circ_bell_basis(n, lamb, T, 1, periodic)
         compiled_circuit = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
         tket_circuit = qiskit_to_tk(compiled_circuit)
         gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
