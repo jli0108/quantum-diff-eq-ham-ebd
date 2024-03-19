@@ -224,20 +224,20 @@ if __name__ == "__main__":
     unary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
 
 
-    print("\nRunning resource estimation for standard binary encoding")
-    for i, N in enumerate(N_vals_binary):
-        T = N
-        start_time = time()
-        print(f"N = {N}")
-        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
+    # print("\nRunning resource estimation for standard binary encoding")
+    # for i, N in enumerate(N_vals_binary):
+    #     T = N
+    #     start_time = time()
+    #     print(f"N = {N}")
+    #     binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
 
-        np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
-                N_vals_binary=N_vals_binary[:i+1],
-                binary_trotter_steps=binary_trotter_steps[:i+1],
-                binary_one_qubit_gate_count_per_trotter_step=binary_one_qubit_gate_count_per_trotter_step[:i+1],
-                binary_two_qubit_gate_count_per_trotter_step=binary_two_qubit_gate_count_per_trotter_step[:i+1])
+    #     np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
+    #             N_vals_binary=N_vals_binary[:i+1],
+    #             binary_trotter_steps=binary_trotter_steps[:i+1],
+    #             binary_one_qubit_gate_count_per_trotter_step=binary_one_qubit_gate_count_per_trotter_step[:i+1],
+    #             binary_two_qubit_gate_count_per_trotter_step=binary_two_qubit_gate_count_per_trotter_step[:i+1])
         
-        print(f"Time = {time() - start_time} seconds.", flush=True)
+    #     print(f"Time = {time() - start_time} seconds.", flush=True)
 
 
     print("\nRunning resource estimation for standard binary encoding w/ Bell basis")
@@ -250,9 +250,9 @@ if __name__ == "__main__":
         lamb = np.pi / 2
         periodic = True
         A = np.zeros((N,N), dtype=np.complex128)
-        for i in range(N-1):
-            A[i,(i+1)%N] = np.exp(-1j * lamb)
-            A[(i+1)%N,i] = np.exp(1j * lamb)
+        for j in range(N-1):
+            A[j,(j+1)%N] = np.exp(-1j * lamb)
+            A[(j+1)%N,j] = np.exp(1j * lamb)
         if periodic:
             A[N-1,0] = np.exp(-1j * lamb)
             A[0,N-1] = np.exp(1j * lamb)
