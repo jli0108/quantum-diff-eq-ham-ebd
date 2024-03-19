@@ -226,7 +226,7 @@ if __name__ == "__main__":
 
     print("\nRunning resource estimation for standard binary encoding")
     for i, N in enumerate(N_vals_binary):
-        T = 1 / N
+        T = N
         start_time = time()
         print(f"N = {N}")
         binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     print("\nRunning resource estimation for standard binary encoding w/ Bell basis")
     for i, n in enumerate(n_vals_bell_basis):
         N = N_vals_bell_basis[i]
-        T = 1 / N
+        T = N
         start_time = time()
         print(f"N = {N}")
 
@@ -307,7 +307,7 @@ if __name__ == "__main__":
     device = LocalSimulator()
 
     for i, N in enumerate(N_vals_one_hot):
-        T = 1 / N
+        T = N
         start_time = time()
 
         pauli_op_1d_list = []
@@ -369,7 +369,7 @@ if __name__ == "__main__":
     device = LocalSimulator()
 
     for i, N in enumerate(N_vals_unary):
-        T = 1 / N
+        T = N
         start_time = time()
 
         pauli_op_1d_list = []
