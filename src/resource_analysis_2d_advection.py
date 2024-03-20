@@ -202,10 +202,10 @@ if __name__ == "__main__":
     print(f"Error tolerance: {error_tol : 0.4f}.")
     print(f"Method: {trotter_method}")
 
-    N_vals_binary = np.arange(3, 128)
-    binary_trotter_steps = np.zeros(len(N_vals_binary), dtype=int)
-    binary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
-    binary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
+    # N_vals_binary = np.arange(3, 128)
+    # binary_trotter_steps = np.zeros(len(N_vals_binary), dtype=int)
+    # binary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
+    # binary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
 
     n_vals_bell_basis = np.arange(2, 8)
     N_vals_bell_basis = 2 ** n_vals_bell_basis
@@ -213,12 +213,12 @@ if __name__ == "__main__":
     bell_basis_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_bell_basis), dtype=int)
     bell_basis_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_bell_basis), dtype=int)
 
-    N_vals_one_hot = np.arange(3, 128)
+    N_vals_one_hot = np.arange(3, 129)
     one_hot_trotter_steps = np.zeros(len(N_vals_one_hot), dtype=int)
     one_hot_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
     one_hot_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
 
-    N_vals_unary = np.arange(3, 128)
+    N_vals_unary = np.arange(3, 129)
     unary_trotter_steps = np.zeros(len(N_vals_unary), dtype=int)
     unary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
     unary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
