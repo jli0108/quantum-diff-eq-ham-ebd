@@ -195,7 +195,7 @@ if __name__ == "__main__":
     print("Number of jobs:", num_jobs)
     num_samples = 1000
 
-    error_tol = 1e-3
+    error_tol = 5e-2
     trotter_method = "second_order"
     dimension = 2
 
@@ -369,6 +369,7 @@ if __name__ == "__main__":
     device = LocalSimulator()
 
     for i, N in enumerate(N_vals_unary):
+        assert N % 2 == 0
         T = N
         start_time = time()
 
@@ -390,26 +391,31 @@ if __name__ == "__main__":
             else:
                 # print(f"n_{j+1}^(0)")
                 b = 0
-            
-            op = n * ['I']
-            op[j%n] = 'X'
-            pauli_op_1d_list.append((''.join(op), 1/4))
+                    
+            if j >= n:
+                c = 1
+            else:
+                c = 0
 
             op = n * ['I']
-            op[j%n] = 'X'
+            op[j%n] = 'Y'
+            pauli_op_1d_list.append((''.join(op), (-1) ** c /4))
+
+            op = n * ['I']
+            op[j%n] = 'Y'
             op[(j-1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), - (-1) ** a /4))
+            pauli_op_1d_list.append((''.join(op), - (-1) ** (a+c) /4))
 
             op = n * ['I']
-            op[j%n] = 'X'
+            op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), - (-1) ** b /4))
+            pauli_op_1d_list.append((''.join(op), - (-1) ** (b+c) /4))
 
             op = n * ['I']
             op[(j-1)%n] = 'Z'
-            op[j%n] = 'X'
+            op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), (-1) ** (a+b) /4))
+            pauli_op_1d_list.append((''.join(op), (-1) ** (a+b+c) /4))
 
         pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
         # pauli_op_2d_list = []
