@@ -80,23 +80,6 @@ def sum_h_y(n : int, h : np.ndarray) -> np.ndarray:
         
     return res
 
-
-def driving_term(n : int, omega : np.ndarray) -> np.ndarray:
-    '''
-    Returns `\sum_i h_i \sigma_y^{(i)}` where `\sigma_y^{(i)}` 
-    is the Pauli-y operator on the ith qubit.
-    '''
-    assert n > 0
-
-    dims = [2 ** i for i in range(n)]
-    
-
-    res = csc_matrix((2 ** n, 2 ** n))
-    for i in range(n):
-        res += omega[i] * tensor([identity(dims[n-i-1], format='csr'), PAULI_Y, identity(dims[i], format='csr')])
-        
-    return 0.5 * res
-
 def sum_delta_n(n : int, delta : np.ndarray) -> np.ndarray:
     '''
     Returns `\sum_i \Delta_i \hat{n}^{(i)}` where `\hat{n}^{(i)}` 
