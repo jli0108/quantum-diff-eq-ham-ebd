@@ -172,7 +172,6 @@ def get_trotterized_circ_bell_basis(n, lamb, T, r, periodic=True):
 
 def get_bell_basis_trotter_error(n, lamb, T, r, U_A, periodic=True):
     circuit = get_trotterized_circ_bell_basis(n, lamb, T, r, periodic)
-    get_trotterized_circ_bell_basis(n, lamb, T, r, periodic)
     U_B = np.array(Operator(circuit))
     error = np.linalg.norm(U_A - U_B, ord=2)
     error_bound = (T ** 2) * (n-1) / 2
@@ -257,19 +256,16 @@ if __name__ == "__main__":
             A[N-1,0] = np.exp(-1j * lamb)
             A[0,N-1] = np.exp(1j * lamb)
 
-        # Ground truth
-        U_A = expm(-1j * A * T)
-
         # Binary search to find Trotter number
 
         r_min, r_max = 1, 10
-        while r_max * get_bell_basis_trotter_error(n, lamb, T / r_max, 1, U_A, periodic=True) > error_tol / dimension:
+        while r_max * get_bell_basis_trotter_error(n, lamb, T / r_max, 1, expm(-1j * A * T / r_max), periodic=True) > error_tol / dimension:
             r_max *= 2
 
         # binary search for r
         while r_max - r_min > 1:
             r = (r_min + r_max) // 2
-            if r * get_bell_basis_trotter_error(n, lamb, T / r, 1, U_A, periodic=True) > error_tol / dimension:
+            if r * get_bell_basis_trotter_error(n, lamb, T / r, 1, expm(-1j * A * T / r), periodic=True) > error_tol / dimension:
                 r_min = r
             else:
                 r_max = r
