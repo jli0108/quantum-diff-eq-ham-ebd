@@ -63,13 +63,13 @@ def get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num
 
     # Estimate number of Trotter steps required
     r_min, r_max = 1, 10
-    while std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(), pauli_op_1d, T, r_max, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+    while r_max * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(), pauli_op_1d, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(), pauli_op_1d, T, r, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+        if r * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(), pauli_op_1d, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
             r_min = r
         else:
             r_max = r
@@ -101,13 +101,13 @@ def estimate_trotter_error_1d_adv(N, T, r):
 
 def get_trotter_number(N, T, error_tol):
     r_min, r_max = 1, 10
-    while estimate_trotter_error_1d_adv(N, T, r_max) > error_tol:
+    while r_max * estimate_trotter_error_1d_adv(N, T / r_max, 1) > error_tol:
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if estimate_trotter_error_1d_adv(N, T, r) > error_tol:
+        if r * estimate_trotter_error_1d_adv(N, T / r, 1) > error_tol:
             r_min = r
         else:
             r_max = r
@@ -202,10 +202,10 @@ if __name__ == "__main__":
     print(f"Error tolerance: {error_tol : 0.4f}.")
     print(f"Method: {trotter_method}")
 
-    # N_vals_binary = np.arange(3, 128)
-    # binary_trotter_steps = np.zeros(len(N_vals_binary), dtype=int)
-    # binary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
-    # binary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
+    N_vals_binary = np.arange(3, 129)
+    binary_trotter_steps = np.zeros(len(N_vals_binary), dtype=int)
+    binary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
+    binary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
 
     n_vals_bell_basis = np.arange(2, 8)
     N_vals_bell_basis = 2 ** n_vals_bell_basis
@@ -224,26 +224,26 @@ if __name__ == "__main__":
     unary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
 
 
-    # print("\nRunning resource estimation for standard binary encoding")
-    # for i, N in enumerate(N_vals_binary):
-    #     T = N
-    #     start_time = time()
-    #     print(f"N = {N}")
-    #     binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
+    print("\nRunning resource estimation for standard binary encoding")
+    for i, N in enumerate(N_vals_binary):
+        T = 0.2 * N
+        start_time = time()
+        print(f"N = {N}")
+        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
 
-    #     np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
-    #             N_vals_binary=N_vals_binary[:i+1],
-    #             binary_trotter_steps=binary_trotter_steps[:i+1],
-    #             binary_one_qubit_gate_count_per_trotter_step=binary_one_qubit_gate_count_per_trotter_step[:i+1],
-    #             binary_two_qubit_gate_count_per_trotter_step=binary_two_qubit_gate_count_per_trotter_step[:i+1])
+        np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
+                N_vals_binary=N_vals_binary[:i+1],
+                binary_trotter_steps=binary_trotter_steps[:i+1],
+                binary_one_qubit_gate_count_per_trotter_step=binary_one_qubit_gate_count_per_trotter_step[:i+1],
+                binary_two_qubit_gate_count_per_trotter_step=binary_two_qubit_gate_count_per_trotter_step[:i+1])
         
-    #     print(f"Time = {time() - start_time} seconds.", flush=True)
+        print(f"Time = {time() - start_time} seconds.", flush=True)
 
 
     print("\nRunning resource estimation for standard binary encoding w/ Bell basis")
     for i, n in enumerate(n_vals_bell_basis):
         N = N_vals_bell_basis[i]
-        T = N
+        T = 0.2 * N
         start_time = time()
         print(f"N = {N}")
 
@@ -263,13 +263,13 @@ if __name__ == "__main__":
         # Binary search to find Trotter number
 
         r_min, r_max = 1, 10
-        while get_bell_basis_trotter_error(n, lamb, T, r_max, U_A, periodic=True) > error_tol / dimension:
+        while r_max * get_bell_basis_trotter_error(n, lamb, T / r_max, 1, U_A, periodic=True) > error_tol / dimension:
             r_max *= 2
 
         # binary search for r
         while r_max - r_min > 1:
             r = (r_min + r_max) // 2
-            if get_bell_basis_trotter_error(n, lamb, T, r, U_A, periodic=True) > error_tol / dimension:
+            if r * get_bell_basis_trotter_error(n, lamb, T / r, 1, U_A, periodic=True) > error_tol / dimension:
                 r_min = r
             else:
                 r_max = r
@@ -307,7 +307,7 @@ if __name__ == "__main__":
     device = LocalSimulator()
 
     for i, N in enumerate(N_vals_one_hot):
-        T = N
+        T = 0.2 * N
         start_time = time()
 
         pauli_op_1d_list = []
@@ -370,7 +370,7 @@ if __name__ == "__main__":
 
     for i, N in enumerate(N_vals_unary):
         assert N % 2 == 0
-        T = N
+        T = 0.2 * N
         start_time = time()
 
         pauli_op_1d_list = []
