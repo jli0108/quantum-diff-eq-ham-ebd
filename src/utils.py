@@ -273,11 +273,15 @@ def get_codewords(N : int, dimension: int, encoding, periodic=False):
 
     return codewords
 
-def num_qubits_per_dim(N, encoding):
+def num_qubits_per_dim(N, encoding, periodic=False):
     if encoding == "one-hot":
         return N
     elif encoding == "unary" or encoding == "antiferromagnetic":
-        return N - 1
+        if periodic:
+            assert N % 2 == 0
+            return N // 2
+        else:
+            return N - 1
     else:
         raise ValueError("Encoding not supported. Valid encodings: unary, antiferromagnetic, one-hot")
     
