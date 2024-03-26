@@ -217,7 +217,7 @@ if __name__ == "__main__":
     one_hot_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
     one_hot_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
 
-    N_vals_unary = np.arange(3, 129)
+    N_vals_unary = np.arange(4, 129, 2)
     unary_trotter_steps = np.zeros(len(N_vals_unary), dtype=int)
     unary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
     unary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
