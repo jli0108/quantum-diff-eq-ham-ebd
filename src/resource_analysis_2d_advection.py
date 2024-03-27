@@ -9,11 +9,12 @@ from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter, SuzukiTrotter
 from qiskit import transpile
-from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.circuit.library import PauliEvolutionGate, RZGate
 from pytket import OpType
 from pytket.passes import RemoveRedundancies, CommuteThroughMultis, SequencePass, FullPeepholeOptimise, auto_rebase_pass
 from pytket.extensions.qiskit import qiskit_to_tk
-from braket.devices import LocalSimulator
+
+from qclib.gates.ldmcsu import Ldmcsu
 
 from os.path import join, dirname
 from utils import *
@@ -113,6 +114,16 @@ def get_trotter_number(N, T, error_tol):
             r_max = r
     return r_max
 
+def get_mcrz(n, theta):
+    circ = QuantumCircuit(n)
+    if n == 2:
+        circ.crz(theta, control_qubit=0, target_qubit=1)
+    else:
+        su2_matrix = np.array([[np.exp(-1.j * theta / 2.), 0.], [0., np.exp(1.j * theta / 2.)]])
+
+        circ.append(Ldmcsu(su2_matrix, int(n-1)), list(range(n)))
+    return circ
+
 # Std binary implementation using Bell basis
 def get_w_circ(j, n, lamb, T):
     
@@ -126,10 +137,11 @@ def get_w_circ(j, n, lamb, T):
         circuit.cx(control_qubit=j, target_qubit=i)
     circuit.p(-lamb, j)
     circuit.h(j)
-    circuit.x(j)
-    circuit.mcp(-T, control_qubits=np.arange(0, j).tolist(), target_qubit=j)
-    circuit.x(j)
-    circuit.mcp(T, control_qubits=np.arange(0, j).tolist(), target_qubit=j)
+
+    # multi_controlled_rz = RZGate(2 * T).control(int(j))
+    multi_controlled_rz = get_mcrz(j+1, 2 * T)
+    circuit.append(multi_controlled_rz, qargs=np.arange(0, j+1).tolist())
+
     circuit.h(j)
     circuit.p(lamb, j)
     for i in range(j):
@@ -150,10 +162,11 @@ def get_v_circ(n, lamb, T, periodic=True):
         circuit.h(n-1)
         for j in range(n-1):
             circuit.x(j)
-        circuit.x(n-1)
-        circuit.mcp(-T, control_qubits=np.arange(0, n-1).tolist(), target_qubit=n-1)
-        circuit.x(n-1)
-        circuit.mcp(T, control_qubits=np.arange(0, n-1).tolist(), target_qubit=n-1)
+
+        # multi_controlled_rz = RZGate(2 * T).control(int(n)-1)
+        multi_controlled_rz = get_mcrz(n, 2 * T)
+        circuit.append(multi_controlled_rz, qargs=np.arange(0, n).tolist())
+
         for j in range(n-1):
             circuit.x(j)
         circuit.h(n-1)
@@ -175,7 +188,8 @@ def get_bell_basis_trotter_error(n, lamb, T, r, U_A, periodic=True):
     U_B = np.array(Operator(circuit))
     error = np.linalg.norm(U_A - U_B, ord=2)
     error_bound = (T ** 2) * (n-1) / 2
-    assert error <= error_bound + 1e-8, "Error larger than error bound?"
+    # print("Error:", error)
+    assert error <= error_bound + 1e-8, f"Error larger than error bound {error_bound}"
     return error
 
 if __name__ == "__main__":
@@ -223,20 +237,20 @@ if __name__ == "__main__":
     unary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
 
 
-    print("\nRunning resource estimation for standard binary encoding")
-    for i, N in enumerate(N_vals_binary):
-        T = 0.2 * N
-        start_time = time()
-        print(f"N = {N}")
-        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
+    # print("\nRunning resource estimation for standard binary encoding")
+    # for i, N in enumerate(N_vals_binary):
+    #     T = 0.2 * N
+    #     start_time = time()
+    #     print(f"N = {N}")
+    #     binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
 
-        np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
-                N_vals_binary=N_vals_binary[:i+1],
-                binary_trotter_steps=binary_trotter_steps[:i+1],
-                binary_one_qubit_gate_count_per_trotter_step=binary_one_qubit_gate_count_per_trotter_step[:i+1],
-                binary_two_qubit_gate_count_per_trotter_step=binary_two_qubit_gate_count_per_trotter_step[:i+1])
+    #     np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
+    #             N_vals_binary=N_vals_binary[:i+1],
+    #             binary_trotter_steps=binary_trotter_steps[:i+1],
+    #             binary_one_qubit_gate_count_per_trotter_step=binary_one_qubit_gate_count_per_trotter_step[:i+1],
+    #             binary_two_qubit_gate_count_per_trotter_step=binary_two_qubit_gate_count_per_trotter_step[:i+1])
         
-        print(f"Time = {time() - start_time} seconds.", flush=True)
+    #     print(f"Time = {time() - start_time} seconds.", flush=True)
 
 
     print("\nRunning resource estimation for standard binary encoding w/ Bell basis")
@@ -297,161 +311,161 @@ if __name__ == "__main__":
         print(f"Time = {time() - start_time} seconds.", flush=True)
 
 
-    # One hot encoding
-    print("\nRunning resource estimation for one-hot encoding", flush=True)
-    encoding = "one-hot"
-    device = LocalSimulator()
+    # # One hot encoding
+    # print("\nRunning resource estimation for one-hot encoding", flush=True)
+    # encoding = "one-hot"
+    # device = LocalSimulator()
 
-    for i, N in enumerate(N_vals_one_hot):
-        T = 0.2 * N
-        start_time = time()
+    # for i, N in enumerate(N_vals_one_hot):
+    #     T = 0.2 * N
+    #     start_time = time()
 
-        pauli_op_1d_list = []
-        for j in range(N):
-            op = N * ['I']
-            op[j] = 'X'
-            op[(j+1)%N] = 'Y'
-            pauli_op_1d_list.append((''.join(op), 1/2))
-            op = N * ['I']
-            op[j] = 'Y'
-            op[(j+1)%N] = 'X'
-            pauli_op_1d_list.append((''.join(op), -1/2))
+    #     pauli_op_1d_list = []
+    #     for j in range(N):
+    #         op = N * ['I']
+    #         op[j] = 'X'
+    #         op[(j+1)%N] = 'Y'
+    #         pauli_op_1d_list.append((''.join(op), 1/2))
+    #         op = N * ['I']
+    #         op[j] = 'Y'
+    #         op[(j+1)%N] = 'X'
+    #         pauli_op_1d_list.append((''.join(op), -1/2))
 
-        pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
-        # pauli_op_2d_list = []
-        # for j in range(len(pauli_op_1d_list)):
-        #     op = pauli_op_1d_list[j]
-        #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
-        #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
-        # # print(pauli_op_2d_list)
-        # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
-        # # print(pauli_op_2d)
+    #     pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
+    #     # pauli_op_2d_list = []
+    #     # for j in range(len(pauli_op_1d_list)):
+    #     #     op = pauli_op_1d_list[j]
+    #     #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
+    #     #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
+    #     # # print(pauli_op_2d_list)
+    #     # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
+    #     # # print(pauli_op_2d)
 
-        # Compute number of gates per Trotter step
-        if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
-        elif trotter_method == "second_order":
-            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
-        else:
-            raise ValueError(f"{trotter_method} not supported")
+    #     # Compute number of gates per Trotter step
+    #     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
+    #         circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+    #     elif trotter_method == "second_order":
+    #         circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+    #     else:
+    #         raise ValueError(f"{trotter_method} not supported")
 
-        compiled_circuit = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-        tket_circuit = qiskit_to_tk(compiled_circuit)
-        gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
-        rebase = auto_rebase_pass(gateset) 
-        comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
-        comp.apply(tket_circuit)
+    #     compiled_circuit = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    #     tket_circuit = qiskit_to_tk(compiled_circuit)
+    #     gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
+    #     rebase = auto_rebase_pass(gateset) 
+    #     comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
+    #     comp.apply(tket_circuit)
 
-        # Gates per Trotter step
-        num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}")
+    #     # Gates per Trotter step
+    #     num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
+    #     print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}")
 
-        # Computes the Trotter error per dimension, so total error will be error_tol
-        one_hot_trotter_steps[i] = get_trotter_number(N, T, error_tol / dimension)
-        one_hot_one_qubit_gate_count_per_trotter_step[i], one_hot_two_qubit_gate_count_per_trotter_step[i] = dimension * num_single_qubit_gates, dimension * num_two_qubit_gates
+    #     # Computes the Trotter error per dimension, so total error will be error_tol
+    #     one_hot_trotter_steps[i] = get_trotter_number(N, T, error_tol / dimension)
+    #     one_hot_one_qubit_gate_count_per_trotter_step[i], one_hot_two_qubit_gate_count_per_trotter_step[i] = dimension * num_single_qubit_gates, dimension * num_two_qubit_gates
 
-        # Save data
-        np.savez(join(CURR_DIR, f"one_hot_{trotter_method}.npz"),
-                 N_vals_one_hot=N_vals_one_hot[:i+1],
-                 one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
-                 one_hot_one_qubit_gate_count_per_trotter_step=one_hot_one_qubit_gate_count_per_trotter_step[:i+1],
-                 one_hot_two_qubit_gate_count_per_trotter_step=one_hot_two_qubit_gate_count_per_trotter_step[:i+1])
+    #     # Save data
+    #     np.savez(join(CURR_DIR, f"one_hot_{trotter_method}.npz"),
+    #              N_vals_one_hot=N_vals_one_hot[:i+1],
+    #              one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
+    #              one_hot_one_qubit_gate_count_per_trotter_step=one_hot_one_qubit_gate_count_per_trotter_step[:i+1],
+    #              one_hot_two_qubit_gate_count_per_trotter_step=one_hot_two_qubit_gate_count_per_trotter_step[:i+1])
 
-        print(f"Finished N = {N}, time = {time() - start_time} seconds.", flush=True)
+    #     print(f"Finished N = {N}, time = {time() - start_time} seconds.", flush=True)
 
-    # Unary encoding
-    print("\nRunning resource estimation for unary encoding", flush=True)
-    encoding = "unary"
-    device = LocalSimulator()
+    # # Unary encoding
+    # print("\nRunning resource estimation for unary encoding", flush=True)
+    # encoding = "unary"
+    # device = LocalSimulator()
 
-    for i, N in enumerate(N_vals_unary):
-        assert N % 2 == 0
-        T = 0.2 * N
-        start_time = time()
+    # for i, N in enumerate(N_vals_unary):
+    #     assert N % 2 == 0
+    #     T = 0.2 * N
+    #     start_time = time()
 
-        pauli_op_1d_list = []
-        n = N // 2
-        for j in range(N):
+    #     pauli_op_1d_list = []
+    #     n = N // 2
+    #     for j in range(N):
 
-            if 1 <= j <= N // 2:
-                # print(f"n_{j-1}^(1)")
-                a = 1
-            else:
-                # print(f"n_{j-1}^(0)")
-                a = 0
+    #         if 1 <= j <= N // 2:
+    #             # print(f"n_{j-1}^(1)")
+    #             a = 1
+    #         else:
+    #             # print(f"n_{j-1}^(0)")
+    #             a = 0
 
-            # print(f"X_{j}")
-            if n - 1 <= j < N - 1:
-                # print(f"n_{j+1}^(1)")
-                b = 1
-            else:
-                # print(f"n_{j+1}^(0)")
-                b = 0
+    #         # print(f"X_{j}")
+    #         if n - 1 <= j < N - 1:
+    #             # print(f"n_{j+1}^(1)")
+    #             b = 1
+    #         else:
+    #             # print(f"n_{j+1}^(0)")
+    #             b = 0
                     
-            if j >= n:
-                c = 1
-            else:
-                c = 0
+    #         if j >= n:
+    #             c = 1
+    #         else:
+    #             c = 0
 
-            op = n * ['I']
-            op[j%n] = 'Y'
-            pauli_op_1d_list.append((''.join(op), (-1) ** c /4))
+    #         op = n * ['I']
+    #         op[j%n] = 'Y'
+    #         pauli_op_1d_list.append((''.join(op), (-1) ** c /4))
 
-            op = n * ['I']
-            op[j%n] = 'Y'
-            op[(j-1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), - (-1) ** (a+c) /4))
+    #         op = n * ['I']
+    #         op[j%n] = 'Y'
+    #         op[(j-1)%n] = 'Z'
+    #         pauli_op_1d_list.append((''.join(op), - (-1) ** (a+c) /4))
 
-            op = n * ['I']
-            op[j%n] = 'Y'
-            op[(j+1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), - (-1) ** (b+c) /4))
+    #         op = n * ['I']
+    #         op[j%n] = 'Y'
+    #         op[(j+1)%n] = 'Z'
+    #         pauli_op_1d_list.append((''.join(op), - (-1) ** (b+c) /4))
 
-            op = n * ['I']
-            op[(j-1)%n] = 'Z'
-            op[j%n] = 'Y'
-            op[(j+1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), (-1) ** (a+b+c) /4))
+    #         op = n * ['I']
+    #         op[(j-1)%n] = 'Z'
+    #         op[j%n] = 'Y'
+    #         op[(j+1)%n] = 'Z'
+    #         pauli_op_1d_list.append((''.join(op), (-1) ** (a+b+c) /4))
 
-        pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
-        # pauli_op_2d_list = []
-        # for j in range(len(pauli_op_1d_list)):
-        #     op = pauli_op_1d_list[j]
-        #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
-        #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
-        # # print(pauli_op_2d_list)
-        # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
-        # # print(pauli_op_2d)
+    #     pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
+    #     # pauli_op_2d_list = []
+    #     # for j in range(len(pauli_op_1d_list)):
+    #     #     op = pauli_op_1d_list[j]
+    #     #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
+    #     #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
+    #     # # print(pauli_op_2d_list)
+    #     # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
+    #     # # print(pauli_op_2d)
 
-        # Compute number of gates per Trotter step
-        if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
-        elif trotter_method == "second_order":
-            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
-        else:
-            raise ValueError(f"{trotter_method} not supported")
+    #     # Compute number of gates per Trotter step
+    #     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
+    #         circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+    #     elif trotter_method == "second_order":
+    #         circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+    #     else:
+    #         raise ValueError(f"{trotter_method} not supported")
 
-        compiled_circuit = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-        tket_circuit = qiskit_to_tk(compiled_circuit)
-        gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
-        rebase = auto_rebase_pass(gateset) 
-        comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
-        comp.apply(tket_circuit)
+    #     compiled_circuit = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    #     tket_circuit = qiskit_to_tk(compiled_circuit)
+    #     gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
+    #     rebase = auto_rebase_pass(gateset) 
+    #     comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
+    #     comp.apply(tket_circuit)
 
-        # Gates per Trotter step
-        num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}")
+    #     # Gates per Trotter step
+    #     num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
+    #     print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}")
 
-        # Computes the Trotter error per dimension, so total error will be error_tol
-        unary_trotter_steps[i] = get_trotter_number(N, T, error_tol / dimension)
-        unary_one_qubit_gate_count_per_trotter_step[i], unary_two_qubit_gate_count_per_trotter_step[i] = dimension * num_single_qubit_gates, dimension * num_two_qubit_gates
+    #     # Computes the Trotter error per dimension, so total error will be error_tol
+    #     unary_trotter_steps[i] = get_trotter_number(N, T, error_tol / dimension)
+    #     unary_one_qubit_gate_count_per_trotter_step[i], unary_two_qubit_gate_count_per_trotter_step[i] = dimension * num_single_qubit_gates, dimension * num_two_qubit_gates
 
-        # Save data
-        np.savez(join(CURR_DIR, f"unary_{trotter_method}.npz"),
-                 N_vals_unary=N_vals_unary[:i+1],
-                 unary_trotter_steps=unary_trotter_steps[:i+1],
-                 unary_one_qubit_gate_count_per_trotter_step=unary_one_qubit_gate_count_per_trotter_step[:i+1],
-                 unary_two_qubit_gate_count_per_trotter_step=unary_two_qubit_gate_count_per_trotter_step[:i+1])
+    #     # Save data
+    #     np.savez(join(CURR_DIR, f"unary_{trotter_method}.npz"),
+    #              N_vals_unary=N_vals_unary[:i+1],
+    #              unary_trotter_steps=unary_trotter_steps[:i+1],
+    #              unary_one_qubit_gate_count_per_trotter_step=unary_one_qubit_gate_count_per_trotter_step[:i+1],
+    #              unary_two_qubit_gate_count_per_trotter_step=unary_two_qubit_gate_count_per_trotter_step[:i+1])
 
-        print(f"Finished N = {N}, time = {time() - start_time} seconds.", flush=True)
+    #     print(f"Finished N = {N}, time = {time() - start_time} seconds.", flush=True)
 
