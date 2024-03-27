@@ -1,5 +1,5 @@
 import numpy as np
-from braket.circuits import Circuit
+# from braket.circuits import Circuit
 from qiskit import QuantumCircuit
 from utils import num_qubits_per_dim
 import requests
@@ -468,79 +468,79 @@ def get_circuit_from_braket(braket_circuit):
             raise TypeError(f"Gate is {instruction.operator.name}, not Rx, Ry, Rz, XX, YY")
     return instructions
 
-def get_braket_native_circuit(instructions):
-    # Requires all gates to be native gates
-    circuit = Circuit()
+# def get_braket_native_circuit(instructions):
+#     # Requires all gates to be native gates
+#     circuit = Circuit()
 
-    for op in instructions:
+#     for op in instructions:
 
-        match op["gate"]:
-            case "gpi":
-                circuit.gpi(op["target"], op["phase"] * 2 * np.pi)
+#         match op["gate"]:
+#             case "gpi":
+#                 circuit.gpi(op["target"], op["phase"] * 2 * np.pi)
             
-            case "gpi2":
-                circuit.gpi2(op["target"], op["phase"] * 2 * np.pi)
+#             case "gpi2":
+#                 circuit.gpi2(op["target"], op["phase"] * 2 * np.pi)
 
-            case "ms":
-                circuit.ms(op["targets"][0], op["targets"][1], op["phases"][0] * 2 * np.pi, op["phases"][1] * 2 * np.pi, op["angle"] * 2 * np.pi)
+#             case "ms":
+#                 circuit.ms(op["targets"][0], op["targets"][1], op["phases"][0] * 2 * np.pi, op["phases"][1] * 2 * np.pi, op["angle"] * 2 * np.pi)
 
-            case _:
-                raise TypeError(f"Gate is {op['''gate''']}, not GPi, GPi2, or MS")
+#             case _:
+#                 raise TypeError(f"Gate is {op['''gate''']}, not GPi, GPi2, or MS")
     
-    return circuit
+#     return circuit
 
 
-# Old state preparation
-def state_prep_braket(N, dimension, amplitudes, encoding):
-    n = num_qubits_per_dim(N, encoding)
-    circuit = Circuit()
+# # Old state preparation
+# def state_prep_braket(N, dimension, amplitudes, encoding):
+#     n = num_qubits_per_dim(N, encoding)
+#     circuit = Circuit()
 
-    for i in range(dimension):
+#     for i in range(dimension):
 
-        if encoding == "unary" or encoding == "antiferromagnetic":
+#         if encoding == "unary" or encoding == "antiferromagnetic":
 
-            assert len(amplitudes) == N
+#             assert len(amplitudes) == N
 
-            circuit.ry(i * n, 2 * np.arccos(amplitudes[0]))
+#             circuit.ry(i * n, 2 * np.arccos(amplitudes[0]))
 
-            for k in np.arange(0, n-1):
-                a = amplitudes[k+1] / np.linalg.norm(amplitudes[k+1:], ord=2)
-                # Y rotation controlled on previous qubit
-                # Controlled Y rotation (basis change on control qubit)
-                circuit.rx(i * n + k, -0.25 * (2 * np.pi))
-                circuit.yy(i * n + k, i * n + k + 1, -np.arccos(a))
-                circuit.rx(i * n + k, 0.25 * (2 * np.pi))
-                circuit.ry(i * n + k + 1, np.arccos(a))
+#             for k in np.arange(0, n-1):
+#                 a = amplitudes[k+1] / np.linalg.norm(amplitudes[k+1:], ord=2)
+#                 # Y rotation controlled on previous qubit
+#                 # Controlled Y rotation (basis change on control qubit)
+#                 circuit.rx(i * n + k, -0.25 * (2 * np.pi))
+#                 circuit.yy(i * n + k, i * n + k + 1, -np.arccos(a))
+#                 circuit.rx(i * n + k, 0.25 * (2 * np.pi))
+#                 circuit.ry(i * n + k + 1, np.arccos(a))
 
-            # Just map from unary to antiferromagnetic encoding
-            if encoding == "antiferromagnetic":
-                for k in range(n):
-                    if k % 2 == 1:
-                        circuit.x(i * n + k)
+#             # Just map from unary to antiferromagnetic encoding
+#             if encoding == "antiferromagnetic":
+#                 for k in range(n):
+#                     if k % 2 == 1:
+#                         circuit.x(i * n + k)
             
 
-        elif encoding == "one-hot":
-            # Start from 1000...0
-            circuit.x(i * n + 0)
-            # Y rotation
-            circuit.ry(i * n + 1, 2 * np.arccos(amplitudes[0]))
-            # CNOT
-            circuit.cnot(i * n + 1, i * n)
+#         elif encoding == "one-hot":
+#             # Start from 1000...0
+#             circuit.x(i * n + 0)
+#             # Y rotation
+#             circuit.ry(i * n + 1, 2 * np.arccos(amplitudes[0]))
+#             # CNOT
+#             circuit.cnot(i * n + 1, i * n)
             
-            for k in np.arange(1, N-1):
-                a = amplitudes[k] / np.linalg.norm(amplitudes[k:], ord=2)
-                # Y rotation controlled on previous qubit
-                circuit.rx(i * n + k, -np.pi/2)
-                circuit.yy(i * n + k, i * n + k + 1, -np.arccos(a))
-                circuit.rx(i * n + k, np.pi/2)
-                circuit.ry(i * n + k + 1, np.arccos(a))
+#             for k in np.arange(1, N-1):
+#                 a = amplitudes[k] / np.linalg.norm(amplitudes[k:], ord=2)
+#                 # Y rotation controlled on previous qubit
+#                 circuit.rx(i * n + k, -np.pi/2)
+#                 circuit.yy(i * n + k, i * n + k + 1, -np.arccos(a))
+#                 circuit.rx(i * n + k, np.pi/2)
+#                 circuit.ry(i * n + k + 1, np.arccos(a))
 
-                # CNOT
-                circuit.cnot(i * n + k + 1, i * n + k)
-        else:
-            raise ValueError("Encoding not supported")
+#                 # CNOT
+#                 circuit.cnot(i * n + k + 1, i * n + k)
+#         else:
+#             raise ValueError("Encoding not supported")
     
-    return circuit
+#     return circuit
 
 def state_prep_circuit(N, dimension, amplitudes, encoding):
 

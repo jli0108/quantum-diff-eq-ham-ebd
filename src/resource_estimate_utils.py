@@ -1,7 +1,7 @@
 import numpy as np
 
 from scipy.sparse.linalg import expm_multiply, expm, norm
-from braket.circuits import Circuit
+# from braket.circuits import Circuit
 
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter
@@ -14,126 +14,126 @@ from os.path import join, dirname
 sys.path.append(join(dirname(__file__), "..", ".."))
 from utils import *
 
-def state_prep(dimension, N, amplitudes_list, encoding):
-    # amplitudes_list: list of length dimension, where each element is a
-    circuit = Circuit()
+# def state_prep(dimension, N, amplitudes_list, encoding):
+#     # amplitudes_list: list of length dimension, where each element is a
+#     circuit = Circuit()
 
-    for i in range(dimension):
-        amplitudes = amplitudes_list[i]
+#     for i in range(dimension):
+#         amplitudes = amplitudes_list[i]
 
-        if encoding == "unary" or encoding == "antiferromagnetic":
+#         if encoding == "unary" or encoding == "antiferromagnetic":
 
-            n = N - 1
-            assert len(amplitudes) == N
+#             n = N - 1
+#             assert len(amplitudes) == N
 
-            circuit.ry(i * n, 2 * np.arccos(amplitudes[0]))
+#             circuit.ry(i * n, 2 * np.arccos(amplitudes[0]))
 
-            for k in np.arange(0, n-1):
-                # Y rotation controlled on previous qubit
-                if np.linalg.norm(amplitudes[k+1:], ord=2) > 1e-8:
-                    # Basis change to Z
-                    circuit.rx(i * n + k+1, np.pi/2)
-                    # Controlled RZ (note the use of two cphaseshift to implement CRZ, braket uses big endian)
-                    a = amplitudes[k+1] / np.linalg.norm(amplitudes[k+1:], ord=2)
-                    circuit.cphaseshift(i * n + k, i * n + k+1, np.arccos(a))
-                    circuit.cphaseshift10(i * n + k, i * n + k + 1, - np.arccos(a))
-                    circuit.rx(i * n + k+1, -np.pi/2)
+#             for k in np.arange(0, n-1):
+#                 # Y rotation controlled on previous qubit
+#                 if np.linalg.norm(amplitudes[k+1:], ord=2) > 1e-8:
+#                     # Basis change to Z
+#                     circuit.rx(i * n + k+1, np.pi/2)
+#                     # Controlled RZ (note the use of two cphaseshift to implement CRZ, braket uses big endian)
+#                     a = amplitudes[k+1] / np.linalg.norm(amplitudes[k+1:], ord=2)
+#                     circuit.cphaseshift(i * n + k, i * n + k+1, np.arccos(a))
+#                     circuit.cphaseshift10(i * n + k, i * n + k + 1, - np.arccos(a))
+#                     circuit.rx(i * n + k+1, -np.pi/2)
 
-            # Just map from unary to antiferromagnetic encoding
-            if encoding == "antiferromagnetic":
-                for k in range(n):
-                    if k % 2 == 1:
-                        circuit.x(i * n + k)
+#             # Just map from unary to antiferromagnetic encoding
+#             if encoding == "antiferromagnetic":
+#                 for k in range(n):
+#                     if k % 2 == 1:
+#                         circuit.x(i * n + k)
             
 
-        elif encoding == "one-hot":
-            n = N
-            # Start from 1000...0
-            circuit.x(i * n + 0)
-            # Y rotation
-            circuit.ry(i * n + 1, 2 * np.arccos(amplitudes[0]))
-            circuit.cnot(1, 0)
-            for k in np.arange(1, N-1):
-                if np.linalg.norm(amplitudes[k:], ord=2) > 1e-8:
-                    # Y rotation controlled on previous qubit
-                    # Basis change to Z
-                    circuit.rx(i * n + k + 1, np.pi/2)
-                    # Controlled Z
-                    a = amplitudes[k] / np.linalg.norm(amplitudes[k:], ord=2)
-                    circuit.cphaseshift(i * n + k, i * n + k + 1, np.arccos(a))
-                    circuit.cphaseshift10(i * n + k, i * n + k + 1, - np.arccos(a))
-                    circuit.rx(i * n + k + 1, -np.pi/2)
+#         elif encoding == "one-hot":
+#             n = N
+#             # Start from 1000...0
+#             circuit.x(i * n + 0)
+#             # Y rotation
+#             circuit.ry(i * n + 1, 2 * np.arccos(amplitudes[0]))
+#             circuit.cnot(1, 0)
+#             for k in np.arange(1, N-1):
+#                 if np.linalg.norm(amplitudes[k:], ord=2) > 1e-8:
+#                     # Y rotation controlled on previous qubit
+#                     # Basis change to Z
+#                     circuit.rx(i * n + k + 1, np.pi/2)
+#                     # Controlled Z
+#                     a = amplitudes[k] / np.linalg.norm(amplitudes[k:], ord=2)
+#                     circuit.cphaseshift(i * n + k, i * n + k + 1, np.arccos(a))
+#                     circuit.cphaseshift10(i * n + k, i * n + k + 1, - np.arccos(a))
+#                     circuit.rx(i * n + k + 1, -np.pi/2)
 
-                    # CNOT
-                    circuit.cnot(i * n + k + 1, i * n + k)
-        else:
-            raise ValueError("Encoding not supported")
+#                     # CNOT
+#                     circuit.cnot(i * n + k + 1, i * n + k)
+#         else:
+#             raise ValueError("Encoding not supported")
     
-    return circuit
+#     return circuit
 
-def get_initial_product_state_circuit(amplitudes_list, dimension, N, encoding):
-    assert len(amplitudes_list) == dimension, "Amplitudes list does not match dimension!"
+# def get_initial_product_state_circuit(amplitudes_list, dimension, N, encoding):
+#     assert len(amplitudes_list) == dimension, "Amplitudes list does not match dimension!"
     
-    n = num_qubits_per_dim(N, encoding)
+#     n = num_qubits_per_dim(N, encoding)
 
 
-    amplitudes_abs_val_list = []
-    for i in range(dimension):
-        amplitudes_abs_val_list.append(np.abs(amplitudes_list[i]))
+#     amplitudes_abs_val_list = []
+#     for i in range(dimension):
+#         amplitudes_abs_val_list.append(np.abs(amplitudes_list[i]))
 
-    circuit = state_prep(dimension, N, amplitudes_abs_val_list, encoding)
+#     circuit = state_prep(dimension, N, amplitudes_abs_val_list, encoding)
 
-    # get the local phase
-    for i in range(dimension):
-        amplitudes = amplitudes_list[i]
-        for j in range(N):
+#     # get the local phase
+#     for i in range(dimension):
+#         amplitudes = amplitudes_list[i]
+#         for j in range(N):
             
-            theta = np.angle(amplitudes[j])
-            if encoding == "unary":
-                if j == 0:
-                    circuit.cphaseshift00(i * n, (i + 1) * n - 1, theta)
-                elif j == N - 1:
-                    circuit.cphaseshift(i * n, (i + 1) * n - 1, theta)
-                else:
-                    circuit.cphaseshift10(i * n + j - 1, i * n + j, theta)
-            elif encoding == "antiferromagnetic":
-                if j == 0:
-                    if N % 2 == 0:
-                        circuit.cphaseshift00(i * n, (i + 1) * n - 1, theta)
-                    else:
-                        circuit.cphaseshift01(i * n, (i + 1) * n - 1, theta)
-                elif j == N - 1:
-                    if N % 2 == 0:
-                        circuit.cphaseshift(i * n, (i + 1) * n - 1, theta)
-                    else:
-                        circuit.cphaseshift10(i * n, (i + 1) * n - 1, theta)
-                else:
-                    if j % 2 == 1:
-                        circuit.cphaseshift10(i * n + j - 1, i * n + j, theta)
-                    else:
-                        circuit.cphaseshift01(i * n + j - 1, i * n + j, theta)
-            elif encoding == "one-hot":
-                circuit.rz(i * N + j, theta)
+#             theta = np.angle(amplitudes[j])
+#             if encoding == "unary":
+#                 if j == 0:
+#                     circuit.cphaseshift00(i * n, (i + 1) * n - 1, theta)
+#                 elif j == N - 1:
+#                     circuit.cphaseshift(i * n, (i + 1) * n - 1, theta)
+#                 else:
+#                     circuit.cphaseshift10(i * n + j - 1, i * n + j, theta)
+#             elif encoding == "antiferromagnetic":
+#                 if j == 0:
+#                     if N % 2 == 0:
+#                         circuit.cphaseshift00(i * n, (i + 1) * n - 1, theta)
+#                     else:
+#                         circuit.cphaseshift01(i * n, (i + 1) * n - 1, theta)
+#                 elif j == N - 1:
+#                     if N % 2 == 0:
+#                         circuit.cphaseshift(i * n, (i + 1) * n - 1, theta)
+#                     else:
+#                         circuit.cphaseshift10(i * n, (i + 1) * n - 1, theta)
+#                 else:
+#                     if j % 2 == 1:
+#                         circuit.cphaseshift10(i * n + j - 1, i * n + j, theta)
+#                     else:
+#                         circuit.cphaseshift01(i * n + j - 1, i * n + j, theta)
+#             elif encoding == "one-hot":
+#                 circuit.rz(i * N + j, theta)
         
-    return circuit
+#     return circuit
 
-def get_trotter_state_vector(N, amplitudes_list, trotterized_circuit, dimension, bitstrings, encoding, device):
+# def get_trotter_state_vector(N, amplitudes_list, trotterized_circuit, dimension, bitstrings, encoding, device):
 
-    # Initial state
-    circ = get_initial_product_state_circuit(amplitudes_list, dimension, N, encoding)
-    circ.add_circuit(trotterized_circuit)
+#     # Initial state
+#     circ = get_initial_product_state_circuit(amplitudes_list, dimension, N, encoding)
+#     circ.add_circuit(trotterized_circuit)
 
-    circ.amplitude(state=bitstrings)
+#     circ.amplitude(state=bitstrings)
 
-    task = device.run(circ)
-    amplitudes = task.result().values[0]
+#     task = device.run(circ)
+#     amplitudes = task.result().values[0]
 
-    state_vector = np.zeros(N ** dimension, dtype=np.complex64)
+#     state_vector = np.zeros(N ** dimension, dtype=np.complex64)
 
-    for i in range(N ** dimension):
-        state_vector[i] = amplitudes[bitstrings[i]]
+#     for i in range(N ** dimension):
+#         state_vector[i] = amplitudes[bitstrings[i]]
     
-    return state_vector
+#     return state_vector
 
 # def estimate_trotter_error_one_sample(N, H, t, trotterized_circuit, dimension, encoding, codewords, device):
 #     n = num_qubits_per_dim(N, encoding)
