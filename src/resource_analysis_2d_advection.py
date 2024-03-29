@@ -314,7 +314,6 @@ if __name__ == "__main__":
     # One hot encoding
     print("\nRunning resource estimation for one-hot encoding", flush=True)
     encoding = "one-hot"
-    device = LocalSimulator()
 
     for i, N in enumerate(N_vals_one_hot):
         T = 0.2 * N
@@ -376,7 +375,6 @@ if __name__ == "__main__":
     # Unary encoding
     print("\nRunning resource estimation for unary encoding", flush=True)
     encoding = "unary"
-    device = LocalSimulator()
 
     for i, N in enumerate(N_vals_unary):
         assert N % 2 == 0
