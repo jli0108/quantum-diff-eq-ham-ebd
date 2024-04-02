@@ -302,7 +302,6 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R, qft_approx_degre
 
     amplitude_vector_left = np.exp(-np.abs(p))[:2**(n_p - 1)]
     amplitude_vector_left /= np.linalg.norm(amplitude_vector_left)
-    q = QuantumRegister(n_p)
     state_prep_circuit = QuantumCircuit(n_p)
     for i in range(n_p-1):
         theta = 2 * np.arccos(1 / np.sqrt(1 + np.exp(-2 * (2 ** i) * h)))
@@ -310,7 +309,7 @@ def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R, qft_approx_degre
     # Make symmetric
     state_prep_circuit.h(n_p - 1)
     for i in range(n_p-1):
-        state_prep_circuit.cnot(n_p - 1, i)
+        state_prep_circuit.cx(n_p - 1, i)
     state_prep_circuit.x(n_p - 1)
 
     state_prep_circuit.append(get_qft(n_p, approx_degree=qft_approx_degree).inverse(), qargs=list(range(n_p)))
@@ -356,7 +355,7 @@ def get_full_circuit(n_x, n_p, t, H_1, H_2, r, R, trotter_method="second_order",
     # Make symmetric
     state_prep_circuit.h(n_p - 1)
     for i in range(n_p-1):
-        state_prep_circuit.cnot(n_p - 1, i)
+        state_prep_circuit.cx(n_p - 1, i)
     state_prep_circuit.x(n_p - 1)
 
     state_prep_circuit.append(get_qft(n_p, approx_degree=qft_approx_degree).inverse(), qargs=list(range(n_p)))
