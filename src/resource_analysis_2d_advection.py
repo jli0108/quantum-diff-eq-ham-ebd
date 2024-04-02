@@ -88,14 +88,33 @@ def estimate_trotter_error_1d_adv(N, T, r):
         else:
             A_1d_odd[i,(i+1)%N] = -1j
             A_1d_odd[(i+1)%N,i] = 1j
+    if N % 2 == 0:
+        A_1d_odd[0,-1] = 1j
+        A_1d_odd[-1,0] = -1j
+    else:
+        A_1d_extra_edge = np.zeros((N,N), dtype=np.complex128)
+        A_1d_extra_edge[0,-1] = 1j
+        A_1d_extra_edge[-1,0] = -1j
 
-    U = expm(-1j * T * (A_1d_even + A_1d_odd))
 
-    U_trotter = np.eye(N)
-    for i in range(r):
-        U_trotter = expm_multiply(-1j * (T / (2 * r)) * A_1d_even, U_trotter)
-        U_trotter = expm_multiply(-1j * (T / r) * A_1d_odd, U_trotter)
-        U_trotter = expm_multiply(-1j * (T / (2 * r)) * A_1d_even, U_trotter)
+    if N % 2 == 0:
+        U = expm(-1j * T * (A_1d_even + A_1d_odd))
+
+        U_trotter = np.eye(N)
+        for i in range(r):
+            U_trotter = expm_multiply(-1j * (T / (2 * r)) * A_1d_even, U_trotter)
+            U_trotter = expm_multiply(-1j * (T / r) * A_1d_odd, U_trotter)
+            U_trotter = expm_multiply(-1j * (T / (2 * r)) * A_1d_even, U_trotter)
+    else:
+        U = expm(-1j * T * (A_1d_even + A_1d_odd + A_1d_extra_edge))
+
+        U_trotter = np.eye(N)
+        for i in range(r):
+            U_trotter = expm_multiply(-1j * (T / (2 * r)) * A_1d_extra_edge, U_trotter)
+            U_trotter = expm_multiply(-1j * (T / (2 * r)) * A_1d_even, U_trotter)
+            U_trotter = expm_multiply(-1j * (T / r) * A_1d_odd, U_trotter)
+            U_trotter = expm_multiply(-1j * (T / (2 * r)) * A_1d_even, U_trotter)
+            U_trotter = expm_multiply(-1j * (T / (2 * r)) * A_1d_extra_edge, U_trotter)
 
     error = np.linalg.norm(U - U_trotter, ord=2)
     return error
