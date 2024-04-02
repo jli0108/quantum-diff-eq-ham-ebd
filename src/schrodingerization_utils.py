@@ -298,6 +298,7 @@ def get_qft(n_p, approx_degree=0):
 
 def get_full_circuit_naive_trotter(n_x, n_p, t, H_1, H_2, r, R, qft_approx_degree=0):
     N_p = 2 ** n_p
+    h = (2 * R) / (N_p - 1)
     p = np.linspace(-R, R, N_p)
 
     amplitude_vector_left = np.exp(-np.abs(p))[:2**(n_p - 1)]
