@@ -1,11 +1,7 @@
 import numpy as np
-from scipy.sparse import eye, lil_matrix, diags
-from resource_estimate_utils import *
-from os.path import join
-from time import time
-import networkx as nx
+from scipy.sparse.linalg import expm_multiply
+from joblib import Parallel, delayed
 
-from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter, SuzukiTrotter
 from qiskit import transpile
@@ -13,7 +9,6 @@ from qiskit.circuit.library import PauliEvolutionGate
 from pytket import OpType
 from pytket.passes import RemoveRedundancies, CommuteThroughMultis, SequencePass, FullPeepholeOptimise, auto_rebase_pass
 from pytket.extensions.qiskit import qiskit_to_tk
-
 
 from os.path import join, dirname
 from utils import *
@@ -122,9 +117,11 @@ def get_schrodingerization_hamiltonian(n, J, h, gamma, n_p, R):
     return pauli_op_list
 
 def estimate_trotter_error(n, T, r, pauli_op, num_samples, num_jobs=16):
+    # print(f"Estimating Trotter error w/ {num_jobs} jobs", flush=True)
     return max(Parallel(n_jobs=num_jobs)(delayed(estimate_trotter_error_one_sample)(n, T, r, pauli_op) for _ in range(num_samples)))
 
 def estimate_trotter_error_one_sample(n, T, r, pauli_op):
+
     pauli_op_grouped = pauli_op.group_commuting()
     H = pauli_op.to_matrix(sparse=True)
     psi_0 = np.random.randn(2 ** n) + 1j * np.random.randn(2 ** n)
@@ -163,13 +160,10 @@ if __name__ == "__main__":
     h = 1
     gamma = 0.05
     R = 8
-    n_p = 5
-    N_p = 2 ** n_p
-    print(f"N_p={N_p}")
 
     error_tol = 5e-2
     num_samples = 1000
-    num_jobs = 64
+    num_jobs = 32
     trotter_method = "second_order"
 
     n_vals = np.arange(2, 17)
@@ -233,6 +227,10 @@ if __name__ == "__main__":
                     lchs_two_qubit_gate_count_per_trotter_step=lchs_two_qubit_gate_count_per_trotter_step[:i+1])
 
     elif args.algorithm == "schrodingerization":
+            
+        n_p = 5
+        N_p = 2 ** n_p
+        print(f"N_p={N_p}")
 
         schrodingerization_trotter_steps = np.zeros(len(n_vals), dtype=int)
         schrodingerization_one_qubit_gate_count_per_trotter_step = np.zeros(len(n_vals), dtype=int)
@@ -242,7 +240,7 @@ if __name__ == "__main__":
         print("Running resource analysis for Schrodingerization")
         for i, n_x in enumerate(n_vals):
 
-            print(f"n_x={n_x}")
+            print(f"n_x={n_x}", flush=True)
             pauli_op = SparsePauliOp.from_list(get_schrodingerization_hamiltonian(n_x, J, h, gamma, n_p, R))
 
             # Compute number of gates per Trotter step
@@ -262,30 +260,29 @@ if __name__ == "__main__":
 
             # Gates per Trotter step
             num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-            print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}")
+            print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}", flush=True)
 
             # Estimate number of Trotter steps required
             r_min, r_max = 1, 10
-            while r_max * estimate_trotter_error(n_x+n_p, T / r_max, 1, pauli_op, num_samples) > error_tol:
+            while r_max * estimate_trotter_error(n_x + n_p, T / r_max, 1, pauli_op, num_samples, num_jobs) > error_tol:
+                print(f"r_max = {r_max}", flush=True)
                 r_max *= 2
-                print(f"r_max={r_max}")
 
             # binary search for r
-            print("Running binary search")
             while r_max - r_min > 1:
                 r = (r_min + r_max) // 2
-                print(f"r={r}")
-                if r * estimate_trotter_error(n_x+n_p, T / r, 1, pauli_op, num_samples) > error_tol:
+                if r * estimate_trotter_error(n_x + n_p, T / r, 1, pauli_op, num_samples, num_jobs) > error_tol:
                     r_min = r
                 else:
                     r_max = r
-            print(f"Trotter steps: {r_max}")
+            print(f"Trotter steps: {r_max}", flush=True)
 
             schrodingerization_one_qubit_gate_count_per_trotter_step[i] = num_single_qubit_gates
             schrodingerization_two_qubit_gate_count_per_trotter_step[i] = num_two_qubit_gates
             schrodingerization_trotter_steps[i] = r_max
 
             np.savez(join(CURR_DIR, "schrodingerization.npz"),
+                    n_p=n_p,
                     n_vals=n_vals[:i+1],
                     schrodingerization_trotter_steps=schrodingerization_trotter_steps[:i+1],
                     schrodingerization_one_qubit_gate_count_per_trotter_step=schrodingerization_one_qubit_gate_count_per_trotter_step[:i+1],
