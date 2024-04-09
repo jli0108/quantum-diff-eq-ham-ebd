@@ -16,7 +16,7 @@ from pytket.extensions.qiskit import qiskit_to_tk
 from os.path import join, dirname
 from utils import *
 
-def get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs):
+def get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, trotter_method, num_samples, num_jobs):
     
     A_1d = np.zeros((N,N), dtype=np.complex128)
     for i in range(N):
@@ -25,17 +25,19 @@ def get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num
 
     A_1d_padded = np.pad(A_1d, (0, 2 ** int(np.ceil(np.log2(N))) - N))
 
-    # print(A_1d_padded)
-    # print(SparsePauliOp.from_operator(A_1d_padded))
+    pauli_op_A_list = SparsePauliOp.from_operator(A_1d_padded).to_list()
 
-    pauli_op_1d_list = SparsePauliOp.from_operator(A_1d_padded).to_list()
-    pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
+    pauli_op_list = []
+    for i in range(len(pauli_op_A_list)):
+        for j in range(len(pauli_op_P_list)):
+            pauli_op_list.append((pauli_op_A_list[i][0] + pauli_op_P_list[j][0], pauli_op_A_list[i][1] * pauli_op_P_list[j][1]))
+    pauli_op = SparsePauliOp.from_list(pauli_op_list)
 
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+        circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
     elif trotter_method == "second_order":
-        circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+        circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
     else:
         raise ValueError(f"{trotter_method} not supported")
     
@@ -52,13 +54,13 @@ def get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num
 
     # Estimate number of Trotter steps required
     r_min, r_max = 1, 10
-    while r_max * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(), pauli_op_1d, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+    while r_max * std_bin_trotter_error_sampling(pauli_op.to_matrix(sparse=True), pauli_op, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if r * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(), pauli_op_1d, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+        if r * std_bin_trotter_error_sampling(pauli_op.to_matrix(sparse=True), pauli_op, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
             r_min = r
         else:
             r_max = r
@@ -133,11 +135,12 @@ if __name__ == "__main__":
     
     print("Resource estimation for 2d Burgers' equation.")
 
-    return
     num_jobs = 64
     print("Number of jobs:", num_jobs)
     num_samples = 1000
 
+    n_p = 8
+    N_p = 2 ** n_p
     error_tol = 5e-2
     trotter_method = "second_order"
     dimension = 2
@@ -161,12 +164,19 @@ if __name__ == "__main__":
     unary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
 
 
+    pauli_op_P_list = []
+    for j in range(n_p-1):
+        op = n_p * ['I']
+        op[n_p-1-j] = 'Z'
+        pauli_op_P_list.append((''.join(op), -2 ** (j-1) / N_p))
+    pauli_op_P_list.append((''.join(n_p * ['I']), (2 ** (n_p-1) - 0.5) / N_p)) 
+
     print("\nRunning resource estimation for standard binary encoding")
     for i, N in enumerate(N_vals_binary):
         T = 0.2 * N
         start_time = time()
         print(f"N = {N}")
-        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
+        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, trotter_method, num_samples, num_jobs)
 
         np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
                 N_vals_binary=N_vals_binary[:i+1],
@@ -184,32 +194,28 @@ if __name__ == "__main__":
         T = 0.2 * N
         start_time = time()
 
-        pauli_op_1d_list = []
+        pauli_op_A_list = []
         for j in range(N):
             op = N * ['I']
             op[j] = 'X'
             op[(j+1)%N] = 'Y'
-            pauli_op_1d_list.append((''.join(op), 1/2))
+            pauli_op_A_list.append((''.join(op), 1/2))
             op = N * ['I']
             op[j] = 'Y'
             op[(j+1)%N] = 'X'
-            pauli_op_1d_list.append((''.join(op), -1/2))
+            pauli_op_A_list.append((''.join(op), -1/2))
 
-        pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
-        # pauli_op_2d_list = []
-        # for j in range(len(pauli_op_1d_list)):
-        #     op = pauli_op_1d_list[j]
-        #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
-        #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
-        # # print(pauli_op_2d_list)
-        # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
-        # # print(pauli_op_2d)
+        pauli_op_list = []
+        for i in range(len(pauli_op_A_list)):
+            for j in range(len(pauli_op_P_list)):
+                pauli_op_list.append((pauli_op_A_list[i][0] + pauli_op_P_list[j][0], pauli_op_A_list[i][1] * pauli_op_P_list[j][1]))
+        pauli_op = SparsePauliOp.from_list(pauli_op_list)
 
         # Compute number of gates per Trotter step
         if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
         elif trotter_method == "second_order":
-            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
         else:
             raise ValueError(f"{trotter_method} not supported")
 
@@ -246,23 +252,18 @@ if __name__ == "__main__":
         T = 0.2 * N
         start_time = time()
 
-        pauli_op_1d_list = []
+        pauli_op_A_list = []
         n = N // 2
         for j in range(N):
 
             if 1 <= j <= N // 2:
-                # print(f"n_{j-1}^(1)")
                 a = 1
             else:
-                # print(f"n_{j-1}^(0)")
                 a = 0
 
-            # print(f"X_{j}")
             if n - 1 <= j < N - 1:
-                # print(f"n_{j+1}^(1)")
                 b = 1
             else:
-                # print(f"n_{j+1}^(0)")
                 b = 0
                     
             if j >= n:
@@ -272,39 +273,35 @@ if __name__ == "__main__":
 
             op = n * ['I']
             op[j%n] = 'Y'
-            pauli_op_1d_list.append((''.join(op), (-1) ** c /4))
+            pauli_op_A_list.append((''.join(op), (-1) ** c /4))
 
             op = n * ['I']
             op[j%n] = 'Y'
             op[(j-1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), - (-1) ** (a+c) /4))
+            pauli_op_A_list.append((''.join(op), - (-1) ** (a+c) /4))
 
             op = n * ['I']
             op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), - (-1) ** (b+c) /4))
+            pauli_op_A_list.append((''.join(op), - (-1) ** (b+c) /4))
 
             op = n * ['I']
             op[(j-1)%n] = 'Z'
             op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), (-1) ** (a+b+c) /4))
+            pauli_op_A_list.append((''.join(op), (-1) ** (a+b+c) /4))
 
-        pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
-        # pauli_op_2d_list = []
-        # for j in range(len(pauli_op_1d_list)):
-        #     op = pauli_op_1d_list[j]
-        #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
-        #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
-        # # print(pauli_op_2d_list)
-        # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
-        # # print(pauli_op_2d)
+        pauli_op_list = []
+        for i in range(len(pauli_op_A_list)):
+            for j in range(len(pauli_op_P_list)):
+                pauli_op_list.append((pauli_op_A_list[i][0] + pauli_op_P_list[j][0], pauli_op_A_list[i][1] * pauli_op_P_list[j][1]))
+        pauli_op = SparsePauliOp.from_list(pauli_op_list)
 
         # Compute number of gates per Trotter step
         if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
         elif trotter_method == "second_order":
-            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
         else:
             raise ValueError(f"{trotter_method} not supported")
 
