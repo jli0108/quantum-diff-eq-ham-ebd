@@ -64,13 +64,13 @@ def get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num
 
     # Estimate number of Trotter steps required
     r_min, r_max = 1, 10
-    while r_max * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(), pauli_op_1d, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+    while r_max * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(sparse=True), pauli_op_1d, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if r * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(), pauli_op_1d, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+        if r * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(sparse=True), pauli_op_1d, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
             r_min = r
         else:
             r_max = r
