@@ -26,6 +26,7 @@ def get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, tr
     A_1d_padded = np.pad(A_1d, (0, 2 ** int(np.ceil(np.log2(N))) - N))
 
     pauli_op_A_list = SparsePauliOp.from_operator(A_1d_padded).to_list()
+    pauli_op_A = SparsePauliOp.from_list(pauli_op_A_list)
 
     pauli_op_list = []
     for i in range(len(pauli_op_A_list)):
@@ -54,13 +55,13 @@ def get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, tr
 
     # Estimate number of Trotter steps required
     r_min, r_max = 1, 10
-    while r_max * std_bin_trotter_error_sampling(pauli_op.to_matrix(sparse=True), pauli_op, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+    while r_max * std_bin_trotter_error_sampling(pauli_op_A.to_matrix(sparse=True), pauli_op_A, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if r * std_bin_trotter_error_sampling(pauli_op.to_matrix(sparse=True), pauli_op, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+        if r * std_bin_trotter_error_sampling(pauli_op_A.to_matrix(sparse=True), pauli_op_A, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
             r_min = r
         else:
             r_max = r
@@ -139,8 +140,9 @@ if __name__ == "__main__":
     print("Number of jobs:", num_jobs)
     num_samples = 1000
 
-    n_p = 8
+    n_p = 9
     N_p = 2 ** n_p
+    p_max = 0.15
     error_tol = 5e-2
     trotter_method = "second_order"
     dimension = 2
@@ -165,17 +167,17 @@ if __name__ == "__main__":
 
 
     pauli_op_P_list = []
-    for j in range(n_p-1):
+    for j in range(n_p):
         op = n_p * ['I']
         op[n_p-1-j] = 'Z'
-        pauli_op_P_list.append((''.join(op), -2 ** (j-1) / N_p))
-    pauli_op_P_list.append((''.join(n_p * ['I']), (2 ** (n_p-1) - 0.5) / N_p)) 
+        pauli_op_P_list.append((''.join(op), -2 ** (j-1) * (p_max / N_p)))
+    pauli_op_P_list.append((''.join(n_p * ['I']), (2 ** (n_p-1) - 0.5) * (p_max / N_p)) )
 
     print("\nRunning resource estimation for standard binary encoding")
     for i, N in enumerate(N_vals_binary):
-        T = 0.2 * N
+        T = 2 * N * p_max
         start_time = time()
-        print(f"N = {N}")
+        print(f"N = {N}", flush=True)
         binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, trotter_method, num_samples, num_jobs)
 
         np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
@@ -191,7 +193,7 @@ if __name__ == "__main__":
     encoding = "one-hot"
 
     for i, N in enumerate(N_vals_one_hot):
-        T = 0.2 * N
+        T = 2 * N * p_max
         start_time = time()
 
         pauli_op_A_list = []
@@ -249,7 +251,7 @@ if __name__ == "__main__":
 
     for i, N in enumerate(N_vals_unary):
         assert N % 2 == 0
-        T = 0.2 * N
+        T = 2 * N * p_max
         start_time = time()
 
         pauli_op_A_list = []
