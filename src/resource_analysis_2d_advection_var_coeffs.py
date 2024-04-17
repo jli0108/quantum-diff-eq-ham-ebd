@@ -3,6 +3,7 @@ from scipy.sparse import eye, lil_matrix
 from resource_estimate_utils import *
 from os.path import join
 from time import time
+import networkx as nx
 
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
@@ -13,10 +14,12 @@ from pytket import OpType
 from pytket.passes import RemoveRedundancies, CommuteThroughMultis, SequencePass, FullPeepholeOptimise, auto_rebase_pass
 from pytket.extensions.qiskit import qiskit_to_tk
 
+from qclib.gates.ldmcsu import Ldmcsu
+
 from os.path import join, dirname
 from utils import *
 
-def get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, trotter_method, num_samples, num_jobs):
+def get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs):
     
     A_1d = np.zeros((N,N), dtype=np.complex128)
     for i in range(N):
@@ -25,20 +28,26 @@ def get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, tr
 
     A_1d_padded = np.pad(A_1d, (0, 2 ** int(np.ceil(np.log2(N))) - N))
 
-    pauli_op_A_list = SparsePauliOp.from_operator(A_1d_padded).to_list()
-    pauli_op_A = SparsePauliOp.from_list(pauli_op_A_list)
+    # print(A_1d_padded)
+    # print(SparsePauliOp.from_operator(A_1d_padded))
 
-    pauli_op_list = []
-    for i in range(len(pauli_op_A_list)):
-        for j in range(len(pauli_op_P_list)):
-            pauli_op_list.append((pauli_op_A_list[i][0] + pauli_op_P_list[j][0], pauli_op_A_list[i][1] * pauli_op_P_list[j][1]))
-    pauli_op = SparsePauliOp.from_list(pauli_op_list)
+    pauli_op_1d_list = SparsePauliOp.from_operator(A_1d_padded).to_list()
+    pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
+    # pauli_op_2d_list = []
+    # for i in range(len(pauli_op_1d_list)):
+    #     n = int(np.ceil(np.log2(N)))
+    #     op = pauli_op_1d_list[i]
+    #     pauli_op_2d_list.append((op[0] + n * 'I', op[1]))
+    #     pauli_op_2d_list.append((n * 'I' + op[0], op[1]))
+    # # print(pauli_op_2d_list)
+    # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
+    # print(pauli_op_2d)
 
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
     elif trotter_method == "second_order":
-        circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
     else:
         raise ValueError(f"{trotter_method} not supported")
     
@@ -55,13 +64,13 @@ def get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, tr
 
     # Estimate number of Trotter steps required
     r_min, r_max = 1, 10
-    while r_max * std_bin_trotter_error_sampling(pauli_op_A.to_matrix(sparse=True), pauli_op_A, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+    while r_max * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(sparse=True), pauli_op_1d, T / r_max, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if r * std_bin_trotter_error_sampling(pauli_op_A.to_matrix(sparse=True), pauli_op_A, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
+        if r * std_bin_trotter_error_sampling(pauli_op_1d.to_matrix(sparse=True), pauli_op_1d, T / r, 1, trotter_method, num_samples, num_jobs) > error_tol / dimension:
             r_min = r
         else:
             r_max = r
@@ -124,25 +133,100 @@ def get_trotter_number(N, T, error_tol):
             r_max = r
     return r_max
 
+def get_mcrz(n, theta):
+    circ = QuantumCircuit(n)
+    if n == 2:
+        circ.crz(theta, control_qubit=0, target_qubit=1)
+    else:
+        su2_matrix = np.array([[np.exp(-1.j * theta / 2.), 0.], [0., np.exp(1.j * theta / 2.)]])
+
+        circ.append(Ldmcsu(su2_matrix, int(n-1)), list(range(n)))
+    return circ
+
+# Std binary implementation using Bell basis
+def get_w_circ(j, n, lamb, T):
+    
+    circuit = QuantumCircuit(n)
+    if j == 0:
+        circuit.p(-lamb, j)
+        circuit.rx(2 * T, j)
+        circuit.p(lamb, j)
+        return circuit
+    for i in range(j):
+        circuit.cx(control_qubit=j, target_qubit=i)
+    circuit.p(-lamb, j)
+    circuit.h(j)
+
+    # multi_controlled_rz = RZGate(2 * T).control(int(j))
+    multi_controlled_rz = get_mcrz(j+1, 2 * T)
+    circuit.append(multi_controlled_rz, qargs=np.arange(0, j+1).tolist())
+
+    circuit.h(j)
+    circuit.p(lamb, j)
+    for i in range(j):
+        circuit.cx(control_qubit=j, target_qubit=j-1-i)
+    return circuit
+
+def get_v_circ(n, lamb, T, periodic=True):
+    circuit = QuantumCircuit(n)
+    
+    # Second order Trotter
+    for j in range(n):
+        circuit.append(get_w_circ(j, n, lamb, T / 2), qargs=np.arange(n).tolist())
+
+    if periodic:
+        for j in range(n-1):
+            circuit.cx(control_qubit=n-1, target_qubit=j)
+        circuit.p(lamb, n-1)
+        circuit.h(n-1)
+        for j in range(n-1):
+            circuit.x(j)
+
+        # multi_controlled_rz = RZGate(2 * T).control(int(n)-1)
+        multi_controlled_rz = get_mcrz(n, 2 * T)
+        circuit.append(multi_controlled_rz, qargs=np.arange(0, n).tolist())
+
+        for j in range(n-1):
+            circuit.x(j)
+        circuit.h(n-1)
+        circuit.p(-lamb, n-1)
+        for j in range(n-1):
+            circuit.cx(control_qubit=n-1, target_qubit=n-2-j)
+    for j in range(n):
+        circuit.append(get_w_circ(n-1-j, n, lamb, T / 2), qargs=np.arange(n).tolist())
+    return circuit
+
+def get_trotterized_circ_bell_basis(n, lamb, T, r, periodic=True):
+    circuit = QuantumCircuit(n)
+    for _ in range(r):
+        circuit.append(get_v_circ(n, lamb, T/r, periodic), qargs=np.arange(n).tolist())
+    return circuit
+
+def get_bell_basis_trotter_error(n, lamb, T, r, U_A, periodic=True):
+    circuit = get_trotterized_circ_bell_basis(n, lamb, T, r, periodic)
+    U_B = np.array(Operator(circuit))
+    error = np.linalg.norm(U_A - U_B, ord=2)
+    error_bound = (T ** 2) * (n-1) / 2
+    # print("Error:", error)
+    assert error <= error_bound + 1e-8, f"Error larger than error bound {error_bound}"
+    return error
+
 if __name__ == "__main__":
 
     DATA_DIR = join(dirname(__file__), "..", "data")
-    TASK_DIR = "2d_burgers"
+    TASK_DIR = "2d_advection_var_coeffs"
 
     CURR_DIR = DATA_DIR
     check_and_make_dir(CURR_DIR)
     CURR_DIR = join(CURR_DIR, TASK_DIR)
     check_and_make_dir(CURR_DIR)
     
-    print("Resource estimation for 2d Burgers' equation.")
+    print("Resource estimation for 2d advection equation.")
 
     num_jobs = 64
     print("Number of jobs:", num_jobs)
     num_samples = 1000
 
-    n_p = 9
-    N_p = 2 ** n_p
-    p_max = 1
     error_tol = 5e-2
     trotter_method = "second_order"
     dimension = 2
@@ -150,35 +234,34 @@ if __name__ == "__main__":
     print(f"Error tolerance: {error_tol : 0.4f}.")
     print(f"Method: {trotter_method}")
 
-    N_vals_binary = np.arange(3, 102)
+    N_vals_binary = np.arange(3, 129)
     binary_trotter_steps = np.zeros(len(N_vals_binary), dtype=int)
     binary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
     binary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
 
-    N_vals_one_hot = np.arange(3, 102)
+    n_vals_bell_basis = np.arange(2, 8)
+    N_vals_bell_basis = 2 ** n_vals_bell_basis
+    bell_basis_trotter_steps = np.zeros(len(N_vals_bell_basis), dtype=int)
+    bell_basis_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_bell_basis), dtype=int)
+    bell_basis_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_bell_basis), dtype=int)
+
+    N_vals_one_hot = np.arange(3, 129)
     one_hot_trotter_steps = np.zeros(len(N_vals_one_hot), dtype=int)
     one_hot_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
     one_hot_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
 
-    N_vals_unary = np.arange(4, 102, 2)
+    N_vals_unary = np.arange(4, 129, 2)
     unary_trotter_steps = np.zeros(len(N_vals_unary), dtype=int)
     unary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
     unary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
 
 
-    pauli_op_P_list = []
-    for j in range(n_p):
-        op = n_p * ['I']
-        op[n_p-1-j] = 'Z'
-        pauli_op_P_list.append((''.join(op), -2 ** (j-1) * (p_max / N_p)))
-    pauli_op_P_list.append((''.join(n_p * ['I']), (2 ** (n_p-1) - 0.5) * (p_max / N_p)) )
-
     print("\nRunning resource estimation for standard binary encoding")
     for i, N in enumerate(N_vals_binary):
-        T = 2 * N
+        T = N
         start_time = time()
-        print(f"N = {N}", flush=True)
-        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, pauli_op_P_list, error_tol, trotter_method, num_samples, num_jobs)
+        print(f"N = {N}")
+        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
 
         np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
                 N_vals_binary=N_vals_binary[:i+1],
@@ -188,36 +271,99 @@ if __name__ == "__main__":
         
         print(f"Time = {time() - start_time} seconds.", flush=True)
 
+
+    print("\nRunning resource estimation for standard binary encoding w/ Bell basis")
+    for i, n in enumerate(n_vals_bell_basis):
+        N = N_vals_bell_basis[i]
+        T = N
+        start_time = time()
+        print(f"N = {N}")
+
+        lamb = np.pi / 2
+        periodic = True
+        A = np.zeros((N,N), dtype=np.complex128)
+        for j in range(N-1):
+            A[j,(j+1)%N] = np.exp(-1j * lamb)
+            A[(j+1)%N,j] = np.exp(1j * lamb)
+        if periodic:
+            A[N-1,0] = np.exp(-1j * lamb)
+            A[0,N-1] = np.exp(1j * lamb)
+
+        # Binary search to find Trotter number
+
+        r_min, r_max = 1, 10
+        while r_max * get_bell_basis_trotter_error(n, lamb, T / r_max, 1, expm(-1j * A * T / r_max), periodic=True) > error_tol / dimension:
+            r_max *= 2
+
+        # binary search for r
+        while r_max - r_min > 1:
+            r = (r_min + r_max) // 2
+            if r * get_bell_basis_trotter_error(n, lamb, T / r, 1, expm(-1j * A * T / r), periodic=True) > error_tol / dimension:
+                r_min = r
+            else:
+                r_max = r
+
+        print("Trotter steps:", r_max)
+        # Get the circuit (for 1D)
+        circuit = get_trotterized_circ_bell_basis(n, lamb, T, 1, periodic)
+        compiled_circuit = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+        tket_circuit = qiskit_to_tk(compiled_circuit)
+        gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
+        rebase = auto_rebase_pass(gateset) 
+        comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
+        comp.apply(tket_circuit)
+
+        # Gates per Trotter step
+        num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
+        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}")
+
+        bell_basis_trotter_steps[i] = r_max
+        bell_basis_one_qubit_gate_count_per_trotter_step[i] = dimension * num_single_qubit_gates
+        bell_basis_two_qubit_gate_count_per_trotter_step[i] = dimension * num_two_qubit_gates
+
+        np.savez(join(CURR_DIR, f"bell_basis_{trotter_method}.npz"),
+                n_vals_bell_basis=n_vals_bell_basis[:i+1],
+                N_vals_bell_basis=N_vals_bell_basis[:i+1],
+                bell_basis_trotter_steps=bell_basis_trotter_steps[:i+1],
+                bell_basis_one_qubit_gate_count_per_trotter_step=bell_basis_one_qubit_gate_count_per_trotter_step[:i+1],
+                bell_basis_two_qubit_gate_count_per_trotter_step=bell_basis_two_qubit_gate_count_per_trotter_step[:i+1])
+        print(f"Time = {time() - start_time} seconds.", flush=True)
+
+
     # One hot encoding
     print("\nRunning resource estimation for one-hot encoding", flush=True)
     encoding = "one-hot"
 
     for i, N in enumerate(N_vals_one_hot):
-        T = 2 * N
+        T = N
         start_time = time()
 
-        pauli_op_A_list = []
+        pauli_op_1d_list = []
         for j in range(N):
             op = N * ['I']
             op[j] = 'X'
             op[(j+1)%N] = 'Y'
-            pauli_op_A_list.append((''.join(op), 1/2))
+            pauli_op_1d_list.append((''.join(op), 1/2))
             op = N * ['I']
             op[j] = 'Y'
             op[(j+1)%N] = 'X'
-            pauli_op_A_list.append((''.join(op), -1/2))
+            pauli_op_1d_list.append((''.join(op), -1/2))
 
-        pauli_op_list = []
-        for j in range(len(pauli_op_A_list)):
-            for k in range(len(pauli_op_P_list)):
-                pauli_op_list.append((pauli_op_A_list[j][0] + pauli_op_P_list[k][0], pauli_op_A_list[j][1] * pauli_op_P_list[k][1]))
-        pauli_op = SparsePauliOp.from_list(pauli_op_list)
+        pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
+        # pauli_op_2d_list = []
+        # for j in range(len(pauli_op_1d_list)):
+        #     op = pauli_op_1d_list[j]
+        #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
+        #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
+        # # print(pauli_op_2d_list)
+        # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
+        # # print(pauli_op_2d)
 
         # Compute number of gates per Trotter step
         if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
         elif trotter_method == "second_order":
-            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
         else:
             raise ValueError(f"{trotter_method} not supported")
 
@@ -251,21 +397,26 @@ if __name__ == "__main__":
 
     for i, N in enumerate(N_vals_unary):
         assert N % 2 == 0
-        T = 2 * N
+        T = N
         start_time = time()
 
-        pauli_op_A_list = []
+        pauli_op_1d_list = []
         n = N // 2
         for j in range(N):
 
             if 1 <= j <= N // 2:
+                # print(f"n_{j-1}^(1)")
                 a = 1
             else:
+                # print(f"n_{j-1}^(0)")
                 a = 0
 
+            # print(f"X_{j}")
             if n - 1 <= j < N - 1:
+                # print(f"n_{j+1}^(1)")
                 b = 1
             else:
+                # print(f"n_{j+1}^(0)")
                 b = 0
                     
             if j >= n:
@@ -275,35 +426,39 @@ if __name__ == "__main__":
 
             op = n * ['I']
             op[j%n] = 'Y'
-            pauli_op_A_list.append((''.join(op), (-1) ** c /4))
+            pauli_op_1d_list.append((''.join(op), (-1) ** c /4))
 
             op = n * ['I']
             op[j%n] = 'Y'
             op[(j-1)%n] = 'Z'
-            pauli_op_A_list.append((''.join(op), - (-1) ** (a+c) /4))
+            pauli_op_1d_list.append((''.join(op), - (-1) ** (a+c) /4))
 
             op = n * ['I']
             op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
-            pauli_op_A_list.append((''.join(op), - (-1) ** (b+c) /4))
+            pauli_op_1d_list.append((''.join(op), - (-1) ** (b+c) /4))
 
             op = n * ['I']
             op[(j-1)%n] = 'Z'
             op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
-            pauli_op_A_list.append((''.join(op), (-1) ** (a+b+c) /4))
+            pauli_op_1d_list.append((''.join(op), (-1) ** (a+b+c) /4))
 
-        pauli_op_list = []
-        for j in range(len(pauli_op_A_list)):
-            for k in range(len(pauli_op_P_list)):
-                pauli_op_list.append((pauli_op_A_list[j][0] + pauli_op_P_list[k][0], pauli_op_A_list[j][1] * pauli_op_P_list[k][1]))
-        pauli_op = SparsePauliOp.from_list(pauli_op_list)
+        pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
+        # pauli_op_2d_list = []
+        # for j in range(len(pauli_op_1d_list)):
+        #     op = pauli_op_1d_list[j]
+        #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
+        #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
+        # # print(pauli_op_2d_list)
+        # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
+        # # print(pauli_op_2d)
 
         # Compute number of gates per Trotter step
         if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
         elif trotter_method == "second_order":
-            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
         else:
             raise ValueError(f"{trotter_method} not supported")
 
