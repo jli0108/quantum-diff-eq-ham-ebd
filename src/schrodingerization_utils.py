@@ -60,16 +60,15 @@ def schrodingerization_ft(A, u_0, N, R, T, N_t, lambda_min, r=None):
     print(H.shape)
     # Solve the PDE
     v = expm_multiply(-1j * H, v_0, start=0, stop=T, num=N_t)
-    
-    IFFT = np.fft.ifft(np.eye(N), N, norm="ortho")
-    v = ((kron(np.eye(dimension), IFFT) @ v.T)).T
+    v = np.reshape(v, newshape=(N_t, dimension, N))
+    v = np.fft.ifft(v, N, norm="ortho", axis=2)
     
     u_recover = np.zeros((N_t, dimension), dtype=np.complex64)
     for i, t in enumerate(np.linspace(0, T, N_t)):
         a = -lambda_min * t
         a_idx = N // 2 + int(a / h)
         # u_recover[i] = np.exp(a) * np.sum(np.reshape(v, newshape=(N_t, dimension, N))[i,:,a_idx:], axis=1) * h
-        u_recover[i] = np.exp(a) * np.sum(np.reshape(np.abs(v), newshape=(N_t, dimension, N))[i,:,a_idx:], axis=1) * h
+        u_recover[i] = np.exp(a) * np.sum(np.abs(v)[i,:,a_idx:], axis=1) * h
     
     return u_recover
 
