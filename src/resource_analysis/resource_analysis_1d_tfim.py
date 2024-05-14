@@ -162,7 +162,7 @@ if __name__ == "__main__":
     num_jobs = 32
     trotter_method = "second_order"
 
-    n_vals = np.arange(2, 17)
+    n_vals = np.arange(2, 15)
 
     if args.algorithm == "lchs":
 
