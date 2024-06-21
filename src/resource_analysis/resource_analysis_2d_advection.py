@@ -22,14 +22,14 @@ sys.path.append(join(".", ".."))
 from utils import *
 
 def get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs):
-    
+    h = 1 / N
     A_1d = np.zeros((N,N), dtype=np.complex128)
     for i in range(N):
         A_1d[i,(i+1)%N] = -1j
         A_1d[(i+1)%N,i] = 1j
-
+    A_1d /= (2 * h)
     A_1d_padded = np.pad(A_1d, (0, 2 ** int(np.ceil(np.log2(N))) - N))
-
+    
     # print(A_1d_padded)
     # print(SparsePauliOp.from_operator(A_1d_padded))
 
@@ -81,6 +81,7 @@ def get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num
     return dimension * num_single_qubit_gates, dimension * num_two_qubit_gates, r_max
 
 def estimate_trotter_error_1d_adv(N, T, r):
+    h = 1 / N
     A_1d_even = np.zeros((N,N), dtype=np.complex128)
     A_1d_odd = np.zeros((N,N), dtype=np.complex128)
     for i in range(N - 1):
@@ -97,6 +98,10 @@ def estimate_trotter_error_1d_adv(N, T, r):
         A_1d_extra_edge = np.zeros((N,N), dtype=np.complex128)
         A_1d_extra_edge[0,-1] = 1j
         A_1d_extra_edge[-1,0] = -1j
+        A_1d_extra_edge /= (2 * h)
+
+    A_1d_even /= (2 * h)
+    A_1d_odd /= (2 * h)
 
 
     if N % 2 == 0:
@@ -210,6 +215,7 @@ def get_bell_basis_trotter_error(n, lamb, T, r, U_A, periodic=True):
     error = np.linalg.norm(U_A - U_B, ord=2)
     error_bound = (T ** 2) * (n-1) / 2
     # print("Error:", error)
+    # print("Error bound:", error_bound)
     assert error <= error_bound + 1e-8, f"Error larger than error bound {error_bound}"
     return error
 
@@ -254,7 +260,7 @@ if __name__ == "__main__":
 
     print("\nRunning resource estimation for standard binary encoding")
     for i, N in enumerate(N_vals_binary):
-        T = N
+        T = 1
         start_time = time()
         print(f"N = {N}")
         binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
@@ -271,7 +277,8 @@ if __name__ == "__main__":
     print("\nRunning resource estimation for standard binary encoding w/ Bell basis")
     for i, n in enumerate(n_vals_bell_basis):
         N = N_vals_bell_basis[i]
-        T = N
+        h = 1 / N
+        T = 1
         start_time = time()
         print(f"N = {N}")
 
@@ -285,16 +292,16 @@ if __name__ == "__main__":
             A[N-1,0] = np.exp(-1j * lamb)
             A[0,N-1] = np.exp(1j * lamb)
 
+        
         # Binary search to find Trotter number
-
         r_min, r_max = 1, 10
-        while r_max * get_bell_basis_trotter_error(n, lamb, T / r_max, 1, expm(-1j * A * T / r_max), periodic=True) > error_tol / dimension:
+        while r_max * get_bell_basis_trotter_error(n, lamb, (T / (2 * h)) / r_max, 1, expm(-1j * A * (T / (2 * h)) / r_max), periodic=True) > error_tol / dimension:
             r_max *= 2
 
         # binary search for r
         while r_max - r_min > 1:
             r = (r_min + r_max) // 2
-            if r * get_bell_basis_trotter_error(n, lamb, T / r, 1, expm(-1j * A * T / r), periodic=True) > error_tol / dimension:
+            if r * get_bell_basis_trotter_error(n, lamb, (T / (2 * h)) / r, 1, expm(-1j * A * (T / (2 * h)) / r), periodic=True) > error_tol / dimension:
                 r_min = r
             else:
                 r_max = r
@@ -331,7 +338,8 @@ if __name__ == "__main__":
     encoding = "one-hot"
 
     for i, N in enumerate(N_vals_one_hot):
-        T = N
+        T = 1
+        h = 1 / N
         start_time = time()
 
         pauli_op_1d_list = []
@@ -346,6 +354,7 @@ if __name__ == "__main__":
             pauli_op_1d_list.append((''.join(op), -1/2))
 
         pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
+        pauli_op_1d /= (2 * h)
         # pauli_op_2d_list = []
         # for j in range(len(pauli_op_1d_list)):
         #     op = pauli_op_1d_list[j]
@@ -393,7 +402,8 @@ if __name__ == "__main__":
 
     for i, N in enumerate(N_vals_unary):
         assert N % 2 == 0
-        T = N
+        T = 1
+        h = 1 / N
         start_time = time()
 
         pauli_op_1d_list = []
@@ -441,6 +451,7 @@ if __name__ == "__main__":
             pauli_op_1d_list.append((''.join(op), (-1) ** (a+b+c) /4))
 
         pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
+        pauli_op_1d /= (2 * h)
         # pauli_op_2d_list = []
         # for j in range(len(pauli_op_1d_list)):
         #     op = pauli_op_1d_list[j]
