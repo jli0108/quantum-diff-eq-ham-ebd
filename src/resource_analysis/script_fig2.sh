@@ -5,6 +5,4 @@
 #SBATCH -t 72:00:00
 #SBATCH --partition=serial
 
-module load python
-
 python fig2.py

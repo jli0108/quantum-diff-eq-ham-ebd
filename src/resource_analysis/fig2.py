@@ -7,14 +7,12 @@ from joblib import Parallel, delayed
 from resource_estimate_utils import *
 from os.path import join
 from time import time
-import networkx as nx
 
 from qiskit import QuantumCircuit
-from qiskit_aer import AerSimulator, StatevectorSimulator
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter, SuzukiTrotter
 from qiskit import transpile
-from qiskit.circuit.library import PauliEvolutionGate, RZGate
+from qiskit.circuit.library import PauliEvolutionGate
 from pytket import OpType
 from pytket.passes import RemoveRedundancies, CommuteThroughMultis, SequencePass, FullPeepholeOptimise, auto_rebase_pass
 from pytket.extensions.qiskit import qiskit_to_tk
@@ -421,10 +419,11 @@ def bell_basis_gate_count_per_trotter_step(n_x, n_p, R, dt):
 if __name__ == "__main__":
 
     print("Running Fig 2 script")
+    start_time = time()
     dimensions = np.arange(1, 10)
-    error_tols = 1 / np.linspace(1, 1000, 10)
+    error_tols = 1 / np.linspace(10, 10000, 10)
     N = 128                                     # grid points along each dimension
-    n_x = np.log2(N)
+    n_x = int(np.log2(N))
     n_p = 5                                     # num qubits for p
     N_p = 2 ** n_p
     T = 1
@@ -446,7 +445,7 @@ if __name__ == "__main__":
             print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}")
 
             '''Schrodingerization w/ Bell basis'''
-            r = get_trotter_number_bell_basis(np.log2(N), T, error_tol=error_tol / dimension, periodic=True)
+            r = get_trotter_number_bell_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
             single_qubit_gates, two_qubit_gates = bell_basis_gate_count_per_trotter_step(n_x, n_p, R, T / r)
             bell_basis_1q_gate_count[dim_idx, error_tol_idx] = r * single_qubit_gates
             bell_basis_2q_gate_count[dim_idx, error_tol_idx] = r * two_qubit_gates
@@ -457,14 +456,17 @@ if __name__ == "__main__":
             one_hot_1q_gate_count[dim_idx, error_tol_idx] = r * single_qubit_gates
             one_hot_2q_gate_count[dim_idx, error_tol_idx] = r * two_qubit_gates
 
+            np.savez(join("../resource_analysis_data", "fig2_data.npz"),
+                    dimensions=dimensions,
+                    error_tols=error_tols,
+                    bell_basis_1q_gate_count=bell_basis_1q_gate_count,
+                    bell_basis_2q_gate_count=bell_basis_2q_gate_count,
+                    one_hot_1q_gate_count=one_hot_1q_gate_count,
+                    one_hot_2q_gate_count=one_hot_2q_gate_count)
 
-    np.savez(join("../resource_analysis_data", "fig2_data.npz"),
-            dimensions=dimensions,
-            error_tols=error_tols,
-            bell_basis_1q_gate_count=bell_basis_1q_gate_count,
-            bell_basis_2q_gate_count=bell_basis_2q_gate_count,
-            one_hot_1q_gate_count=one_hot_1q_gate_count,
-            one_hot_2q_gate_count=one_hot_2q_gate_count)
+    end_time = time()
+    print(f"Runtime: {end_time - start_time}")
 
+    print("Finished!")
 
 
