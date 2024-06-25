@@ -429,7 +429,7 @@ if __name__ == "__main__":
     T = 1
     R = 8
     num_samples = 1000
-    num_jobs = 16
+    num_jobs = 32
     trotter_method="second_order"
 
     print("dimensions:", dimensions)
@@ -452,7 +452,7 @@ if __name__ == "__main__":
 
             '''One-hot encoding (ours)'''
             r = get_trotter_number_one_hot(N, N_p, R, T, error_tol / dimension, num_samples, num_jobs)
-            single_qubit_gates, two_qubit_gates = one_hot_gate_count_per_trotter_step(N, n_p, R, T / r)
+            single_qubit_gates, two_qubit_gates = one_hot_gate_count_per_trotter_step(N, n_p, R, trotter_method)
             one_hot_1q_gate_count[dim_idx, error_tol_idx] = r * single_qubit_gates
             one_hot_2q_gate_count[dim_idx, error_tol_idx] = r * two_qubit_gates
 
