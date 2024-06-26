@@ -1,6 +1,5 @@
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 from scipy.sparse import eye, lil_matrix, diags
 from joblib import Parallel, delayed
@@ -431,9 +430,10 @@ if __name__ == "__main__":
     num_jobs = 16
     trotter_method="second_order"
 
-    print("dimensions:", dimensions)
-    print("error tolerances:", error_tols)
+    print("dimensions:", dimensions, flush=True)
+    print("error tolerances:", error_tols, flush=True)
 
+    print("Computing Trotter steps.")
     bell_basis_trotter_steps = np.zeros((len(dimensions), len(error_tols)))
     one_hot_trotter_steps = np.zeros((len(dimensions), len(error_tols)))
 
@@ -446,7 +446,7 @@ if __name__ == "__main__":
             print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}", flush=True)
 
             '''Schrodingerization w/ Bell basis'''
-            bell_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_bell_basis(np.log2(N), T, error_tol=error_tol / dimension, periodic=True)
+            bell_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_bell_basis(np.log2(N), T, error_tol / dimension, num_samples, num_jobs)
             print("Bell basis Trotter steps:", bell_basis_trotter_steps[dim_idx, error_tol_idx], flush=True)
             
             '''One-hot encoding (ours)'''
