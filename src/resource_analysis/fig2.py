@@ -439,7 +439,7 @@ if __name__ == "__main__":
 
     # Gate counts per Trotter step
     bell_basis_single_qubit_gates, bell_basis_two_qubit_gates = bell_basis_gate_count_per_trotter_step(n_x, n_p, R, T)
-    one_hot_single_qubit_gates, one_hot_two_qubit_gates = one_hot_gate_count_per_trotter_step(N, n_p, R, T)
+    one_hot_single_qubit_gates, one_hot_two_qubit_gates = one_hot_gate_count_per_trotter_step(N, n_p, R, trotter_method)
 
     for dim_idx, dimension in enumerate(dimensions):
         for error_tol_idx, error_tol in enumerate(error_tols):
