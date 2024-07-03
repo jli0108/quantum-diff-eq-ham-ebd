@@ -446,7 +446,7 @@ if __name__ == "__main__":
             print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}", flush=True)
 
             '''Schrodingerization w/ Bell basis'''
-            bell_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_bell_basis(np.log2(N), T, error_tol / dimension, num_samples, num_jobs)
+            bell_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_bell_basis(np.log2(N), n_p, R, T, error_tol / dimension, num_samples, num_jobs)
             print("Bell basis Trotter steps:", bell_basis_trotter_steps[dim_idx, error_tol_idx], flush=True)
             
             '''One-hot encoding (ours)'''
