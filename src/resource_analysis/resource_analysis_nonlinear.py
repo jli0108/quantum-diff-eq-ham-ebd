@@ -151,13 +151,14 @@ def get_H_one_hot(N, n_p, R):
         op = N * ['I']
         op[j] = 'X'
         op[(j+1)%N] = 'X'
-        F_x_1_pauli_list.append((''.join(op), 0.5*F_x_1_pauli_list[(j+1)%N,j].real))
-        F_p_1_pauli_list.append((''.join(op), 0.5*F_p_1_pauli_list[(j+1)%N,j].real))
+        F_x_1_pauli_list.append((''.join(op), 0.5*F_x_1[(j+1)%N,j].real))
+        F_p_1_pauli_list.append((''.join(op), 0.5*F_p_1[(j+1)%N,j].real))
 
         op = N * ['I']
         op[j] = 'Y'
         op[(j+1)%N] = 'Y'
-        F_p_1_pauli_list.append((''.join(op), 0.5*F_p_1_pauli_list[(j+1)%N,j].real))
+        F_x_1_pauli_list.append((''.join(op), 0.5*F_x_1[(j+1)%N,j].real))
+        F_p_1_pauli_list.append((''.join(op), 0.5*F_p_1[(j+1)%N,j].real))
 
     for j in range(N):
         op = N * ['I']
