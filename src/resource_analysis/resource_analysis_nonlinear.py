@@ -41,110 +41,170 @@ def get_xi_pauli_op(n_p, R):
 def get_H_std_binary(N, n_p, R):
     h = 1 / N
 
-    A = lil_matrix((N, N), dtype=np.complex128)
+    F_x = lil_matrix((N, N), dtype=np.complex128)
+    for j in range(N):
+        F_x[j,(j+1)%N] = 1
+        F_x[j,j] = -1
+    F_x /= h
+
+    F_p = lil_matrix((N, N), dtype=np.complex128)
+    for j in range(N):
+        p = j / N
+        F_p[j,(j+1)%N] = (p * (1-p) + 1)
+        F_p[j,j] = - (p * (1-p) + 1)
+    F_p /= h
+
+    D_x = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
         x = j / N
-        A[j,(j+1)%N] = (x * (1-x) + 1)
-        A[j,j] = - (x * (1-x) + 1)
-    A /= h
+        D_x[j,j] = x * (1-x) + 1
 
-    D = lil_matrix((N, N), dtype=np.complex128)
+    D_p = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
-        x = j / N
-        D[j,j] = 1 + x * (1 - x)
+        p = j / N
+        D_p[j,j] = p
 
-    H_1 = (A + np.conj(A.T)) / 2
-    H_2 = (A - np.conj(A.T)) / 2j
 
-    H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
-    H_2_pauli_list = SparsePauliOp.from_operator(H_2.toarray()).to_list()
-    D_pauli_list = SparsePauliOp.from_operator(D.toarray()).to_list()
+    F_x_1 = (F_x + np.conj(F_x.T)) / 2
+    F_x_2 = (F_x - np.conj(F_x.T)) / 2j
+    F_p_1 = (F_p + np.conj(F_p.T)) / 2
+    F_p_2 = (F_p - np.conj(F_p.T)) / 2j
+
+    F_x_1_pauli_list = SparsePauliOp.from_operator(F_x_1.toarray()).to_list()
+    F_x_2_pauli_list = SparsePauliOp.from_operator(F_x_2.toarray()).to_list()
+    F_p_1_pauli_list = SparsePauliOp.from_operator(F_p_1.toarray()).to_list()
+    F_p_2_pauli_list = SparsePauliOp.from_operator(F_p_2.toarray()).to_list()
+    D_x_pauli_list = SparsePauliOp.from_operator(D_x.toarray()).to_list()
+    D_p_pauli_list = SparsePauliOp.from_operator(D_p.toarray()).to_list()
     H_F_pauli_list = (-get_xi_pauli_op(n_p, R)).to_list()
 
     H_pauli_list = []
 
     # Hermitian part
-    for j in range(len(H_2_pauli_list)):
-        for k in range(len(D_pauli_list)):
-            H_pauli_list.append((n_p * 'I' + H_2_pauli_list[j][0] + D_pauli_list[k][0], -(H_2_pauli_list[j][1] * D_pauli_list[k][1]).real))
-            H_pauli_list.append((n_p * 'I' + D_pauli_list[k][0] + H_2_pauli_list[j][0], -(H_2_pauli_list[j][1] * D_pauli_list[k][1]).real))
+    for j in range(len(F_x_1_pauli_list)):
+        for k in range(len(D_p_pauli_list)):
+            for l in range(len(H_F_pauli_list)):
+                H_pauli_list.append((F_x_1_pauli_list[j][0] + D_p_pauli_list[k][0] + H_F_pauli_list[l][0], (F_x_1_pauli_list[j][1] * D_p_pauli_list[k][1] * H_F_pauli_list[l][1]).real))
+                
+    for j in range(len(F_p_1_pauli_list)):
+        for k in range(len(D_x_pauli_list)):
+            for l in range(len(H_F_pauli_list)):
+                H_pauli_list.append((F_p_1_pauli_list[j][0] + D_x_pauli_list[k][0] + H_F_pauli_list[l][0], (F_p_1_pauli_list[j][1] * D_x_pauli_list[k][1] * H_F_pauli_list[l][1]).real))
+    
     # Anti-Hermitian part
-    for i in range(len(H_F_pauli_list)):
-        for j in range(len(H_1_pauli_list)):
-            for k in range(len(D_pauli_list)):
-                H_pauli_list.append((H_F_pauli_list[i][0] + H_1_pauli_list[j][0] + D_pauli_list[k][0], (H_F_pauli_list[i][1] * H_1_pauli_list[j][1] * D_pauli_list[k][1]).real))
-                H_pauli_list.append((H_F_pauli_list[i][0] + D_pauli_list[k][0] + H_1_pauli_list[j][0], (H_F_pauli_list[i][1] * H_1_pauli_list[j][1] * D_pauli_list[k][1]).real))
-
+    for j in range(len(F_x_2_pauli_list)):
+        for k in range(len(D_p_pauli_list)):
+            H_pauli_list.append((F_x_2_pauli_list[j][0] + D_p_pauli_list[k][0] + n_p * 'I', -(F_x_2_pauli_list[j][1] * D_p_pauli_list[k][1]).real))
+    for j in range(len(F_p_2_pauli_list)):
+        for k in range(len(D_x_pauli_list)):
+            H_pauli_list.append((F_p_2_pauli_list[j][0] + D_x_pauli_list[k][0] + n_p * 'I', -(F_p_2_pauli_list[j][1] * D_x_pauli_list[k][1]).real))
+    
     H = SparsePauliOp.from_list(H_pauli_list)
     return H
 
 def get_H_one_hot(N, n_p, R):
+
     h = 1 / N
-    A = lil_matrix((N, N), dtype=np.complex128)
+
+    F_x = lil_matrix((N, N), dtype=np.complex128)
+    for j in range(N):
+        F_x[j,(j+1)%N] = 1
+        F_x[j,j] = -1
+    F_x /= h
+
+    F_p = lil_matrix((N, N), dtype=np.complex128)
+    for j in range(N):
+        p = j / N
+        F_p[j,(j+1)%N] = (p * (1-p) + 1)
+        F_p[j,j] = - (p * (1-p) + 1)
+    F_p /= h
+
+    D_x = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
         x = j / N
-        A[j,(j+1)%N] = (x * (1-x) + 1)
-        A[j,j] = - (x * (1-x) + 1)
-    A /= h
+        D_x[j,j] = x * (1-x) + 1
 
-    D = lil_matrix((N, N), dtype=np.complex128)
+    D_p = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
-        x = j / N
-        D[j,j] = 1 + x * (1 - x)
-
-    H_1 = (A + np.conj(A.T)) / 2
-    H_2 = (A - np.conj(A.T)) / 2j
+        p = j / N
+        D_p[j,j] = p
 
 
-    H_1_pauli_list = []
-    H_2_pauli_list = []
-    D_pauli_list = []
+    F_x_1 = (F_x + np.conj(F_x.T)) / 2
+    F_x_2 = (F_x - np.conj(F_x.T)) / 2j
+    F_p_1 = (F_p + np.conj(F_p.T)) / 2
+    F_p_2 = (F_p - np.conj(F_p.T)) / 2j
 
-    H_1_pauli_list.append((N * 'I', H_1[0,0].real))
+
+
+    F_x_1_pauli_list = []
+    F_x_2_pauli_list = []
+    F_p_1_pauli_list = []
+    F_p_2_pauli_list = []
+    D_x_pauli_list = []
+    D_p_pauli_list = []
+    H_F_pauli_list = (-get_xi_pauli_op(n_p, R)).to_list()
+
+    F_x_1_pauli_list.append((N * 'I', F_x_1[0,0].real))
+    F_p_1_pauli_list.append((N * 'I', F_p_1[0,0].real))
     for j in range(N):
         op = N * ['I']
         op[j] = 'X'
         op[(j+1)%N] = 'X'
-        H_1_pauli_list.append((''.join(op), 0.5*H_1[(j+1)%N,j].real))
+        F_x_1_pauli_list.append((''.join(op), 0.5*F_x_1_pauli_list[(j+1)%N,j].real))
+        F_p_1_pauli_list.append((''.join(op), 0.5*F_p_1_pauli_list[(j+1)%N,j].real))
 
         op = N * ['I']
         op[j] = 'Y'
         op[(j+1)%N] = 'Y'
-        H_1_pauli_list.append((''.join(op), 0.5*H_1[(j+1)%N,j].real))
+        F_p_1_pauli_list.append((''.join(op), 0.5*F_p_1_pauli_list[(j+1)%N,j].real))
 
     for j in range(N):
         op = N * ['I']
         op[j] = 'X'
         op[(j+1)%N] = 'Y'
-        H_2_pauli_list.append((''.join(op), 0.5*H_2[(j+1)%N,j].imag))
+        F_x_2_pauli_list.append((''.join(op), 0.5*F_x_2[(j+1)%N,j].imag))
+        F_p_2_pauli_list.append((''.join(op), 0.5*F_p_2[(j+1)%N,j].imag))
 
         op = N * ['I']
         op[j] = 'Y'
         op[(j+1)%N] = 'X'
-        H_2_pauli_list.append((''.join(op), -0.5*H_2[(j+1)%N,j].imag))
+        F_x_2_pauli_list.append((''.join(op), -0.5*F_x_2[(j+1)%N,j].imag))
+        F_p_2_pauli_list.append((''.join(op), -0.5*F_p_2[(j+1)%N,j].imag))
 
     for j in range(N):
-        D_pauli_list.append((N * 'I', 0.5 * D[j,j].real))
+        D_x_pauli_list.append((N * 'I', 0.5 * D_x[j,j].real))
         op = N * ['I']
         op[j] = 'Z'
-        D_pauli_list.append((''.join(op), -0.5 * D[j,j].real))
+        D_x_pauli_list.append((''.join(op), -0.5 * D_x[j,j].real))
 
-    H_F_pauli_list = (-get_xi_pauli_op(n_p, R)).to_list()
+        D_p_pauli_list.append((N * 'I', 0.5 * D_p[j,j].real))
+        op = N * ['I']
+        op[j] = 'Z'
+        D_p_pauli_list.append((''.join(op), -0.5 * D_p[j,j].real))
+
 
     H_pauli_list = []
 
     # Hermitian part
-    for j in range(len(H_2_pauli_list)):
-        for k in range(len(D_pauli_list)):
-            H_pauli_list.append((n_p * 'I' + H_2_pauli_list[j][0] + D_pauli_list[k][0], -(H_2_pauli_list[j][1] * D_pauli_list[k][1]).real))
-            H_pauli_list.append((n_p * 'I' + D_pauli_list[k][0] + H_2_pauli_list[j][0], -(H_2_pauli_list[j][1] * D_pauli_list[k][1]).real))
+    for j in range(len(F_x_1_pauli_list)):
+        for k in range(len(D_p_pauli_list)):
+            for l in range(len(H_F_pauli_list)):
+                H_pauli_list.append((F_x_1_pauli_list[j][0] + D_p_pauli_list[k][0] + H_F_pauli_list[l][0], (F_x_1_pauli_list[j][1] * D_p_pauli_list[k][1] * H_F_pauli_list[l][1]).real))
+                
+    for j in range(len(F_p_1_pauli_list)):
+        for k in range(len(D_x_pauli_list)):
+            for l in range(len(H_F_pauli_list)):
+                H_pauli_list.append((F_p_1_pauli_list[j][0] + D_x_pauli_list[k][0] + H_F_pauli_list[l][0], (F_p_1_pauli_list[j][1] * D_x_pauli_list[k][1] * H_F_pauli_list[l][1]).real))
+    
     # Anti-Hermitian part
-    for i in range(len(H_F_pauli_list)):
-        for j in range(len(H_1_pauli_list)):
-            for k in range(len(D_pauli_list)):
-                H_pauli_list.append((H_F_pauli_list[i][0] + H_1_pauli_list[j][0] + D_pauli_list[k][0], (H_F_pauli_list[i][1] * H_1_pauli_list[j][1] * D_pauli_list[k][1]).real))
-                H_pauli_list.append((H_F_pauli_list[i][0] + D_pauli_list[k][0] + H_1_pauli_list[j][0], (H_F_pauli_list[i][1] * H_1_pauli_list[j][1] * D_pauli_list[k][1]).real))
-
+    for j in range(len(F_x_2_pauli_list)):
+        for k in range(len(D_p_pauli_list)):
+            H_pauli_list.append((F_x_2_pauli_list[j][0] + D_p_pauli_list[k][0] + n_p * 'I', -(F_x_2_pauli_list[j][1] * D_p_pauli_list[k][1]).real))
+    for j in range(len(F_p_2_pauli_list)):
+        for k in range(len(D_x_pauli_list)):
+            H_pauli_list.append((F_p_2_pauli_list[j][0] + D_x_pauli_list[k][0] + n_p * 'I', -(F_p_2_pauli_list[j][1] * D_x_pauli_list[k][1]).real))
+    
     H = SparsePauliOp.from_list(H_pauli_list)
     return H
 
@@ -231,10 +291,10 @@ def get_second_order_trotter_steps(t, H, epsilon):
 
 if __name__ == "__main__":
 
-    print("Running Fig 2 script (nonseparable)", flush=True)
+    print("Running resource analysis for nonlinear PDE", flush=True)
     start_time = time()
     error_tols = np.exp(-np.linspace(np.log(10), np.log(1000), 10))
-    N = 128                                     # grid points along each dimension
+    N = 64                                     # grid points along each dimension
     n_x = int(np.log2(N))
     n_p = 5                                     # num qubits for p
     N_p = 2 ** n_p
@@ -260,7 +320,7 @@ if __name__ == "__main__":
     '''One-hot encoding (ours)'''
     one_hot_trotter_steps = get_first_order_trotter_steps(T, H_one_hot, error_tols)
 
-    np.savez(join("../resource_analysis_data", "fig2_nonseparable_data.npz"),
+    np.savez(join("../resource_analysis_data", f"nonlinear_{N}.npz"),
             error_tols=error_tols,
             pauli_basis_trotter_steps=pauli_basis_trotter_steps,
             pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates,
