@@ -255,44 +255,49 @@ def get_gate_count_per_trotter_step(H, trotter_method="second_order"):
     elif trotter_method == "second_order":
         return 2 * num_single_qubit_gates, num_two_qubit_gates
 
-def get_first_order_trotter_steps(t, H, epsilon):
-    coeff = 0
+def accumulator_sum(generator):
+    result = 0
+    for value in generator:
+        result += value
+    return result
+
+def get_first_order_trotter_steps(t, H, epsilon, n_jobs=16):
     L = len(H)
-    for j in range(L-1):
-        if j % 500 == 0:
-            print(f"Getting Trotter steps: [{j}/{L}]", end="\r")
+    res = Parallel(n_jobs=n_jobs, return_as="generator")(delayed(get_comm_term_first_order)(H, L, j) for j in range(L-1))
+    coeff = accumulator_sum(res)
 
-        comm_term = 0
-        for k in np.arange(j+1, L):
-            comm_term += commutator(H[k], H[j])
-        comm_term.simplify()
-        coeff += np.linalg.norm(comm_term.coeffs, ord=1)
+    return np.ceil((t ** 2 * coeff / (2 * epsilon)))
 
-    print(f"Getting Trotter steps: [{L}/{L}]")
-    
-    return int(np.ceil((t ** 2 * coeff / (2 * epsilon))))
+def get_comm_term_first_order(H, L, j):
+    comm_term = 0
+    for k in np.arange(j+1, L):
+        comm_term += commutator(H[k], H[j])
+    comm_term.simplify()
+    return np.linalg.norm(comm_term.coeffs, ord=1)
 
-def get_second_order_trotter_steps(t, H, epsilon):
-    coeff = 0
+
+def get_second_order_trotter_steps(t, H, epsilon, n_jobs=16):
     L = len(H)
-    for j in range(L-1):
-        if j % 500 == 0:
-            print(f"Getting Trotter steps: [{j}/{L}]", end="\r")
-        comm_term = 0
-        for k in np.arange(j+1, L):
-            for l in np.arange(j+1, L):
-                comm_term += commutator(H[l], commutator(H[k], H[j]))
-        comm_term.simplify()
-        coeff += np.linalg.norm(comm_term.coeffs, ord=1)
+    res = Parallel(n_jobs=n_jobs, return_as="generator")(delayed(get_comm_term_second_order)(H, L, j) for j in range(L-1))
+    coeff = accumulator_sum(res)
 
-        comm_term = 0
-        for k in np.arange(j+1, L):
-            comm_term += commutator(H[j], commutator(H[j], H[k]))
-        comm_term.simplify()
-        coeff += 0.5 * np.linalg.norm(comm_term.coeffs, ord=1)
-    print(f"Getting Trotter steps: [{L}/{L}]")
+    return np.ceil(np.sqrt(t ** 3 * coeff / (12 * epsilon)))
 
-    return int(np.ceil(np.sqrt(t ** 3 * coeff / (12 * epsilon))))
+def get_comm_term_second_order(H, L, j):
+    comm_term = 0
+    for k in np.arange(j+1, L):
+        for l in np.arange(j+1, L):
+            comm_term += commutator(H[l], commutator(H[k], H[j]))
+    comm_term.simplify()
+    coeff1 = np.linalg.norm(comm_term.coeffs, ord=1)
+
+    comm_term = 0
+    for k in np.arange(j+1, L):
+        comm_term += commutator(H[j], commutator(H[j], H[k]))
+    comm_term.simplify()
+    coeff2 = 0.5 * np.linalg.norm(comm_term.coeffs, ord=1)
+
+    return coeff1 + coeff2
 
 
 if __name__ == "__main__":
@@ -326,7 +331,7 @@ if __name__ == "__main__":
     '''One-hot encoding (ours)'''
     one_hot_trotter_steps = get_second_order_trotter_steps(T, H_one_hot, error_tols)
 
-    np.savez(join("../resource_analysis_data", f"nonlinear_data_{N}_{trotter_method}.npz"),
+    np.savez(join("../resource_analysis_data", f"nonlinear_data_{trotter_method}.npz"),
             error_tols=error_tols,
             pauli_basis_trotter_steps=pauli_basis_trotter_steps,
             pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates,
