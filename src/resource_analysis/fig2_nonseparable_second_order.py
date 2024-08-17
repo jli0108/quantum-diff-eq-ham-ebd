@@ -56,26 +56,23 @@ def get_H_std_binary(N, n_p, R):
     H_1 = (A + np.conj(A.T)) / 2
     H_2 = (A - np.conj(A.T)) / 2j
 
-    H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
-    H_2_pauli_list = SparsePauliOp.from_operator(H_2.toarray()).to_list()
-    D_pauli_list = SparsePauliOp.from_operator(D.toarray()).to_list()
-    H_F_pauli_list = (-get_xi_pauli_op(n_p, R)).to_list()
+    H_1_pauli_op_grouped = SparsePauliOp.from_operator(H_1.toarray()).group_commuting()
+    H_2_pauli_op_grouped = SparsePauliOp.from_operator(H_2.toarray()).group_commuting()
+    D_pauli_op = SparsePauliOp.from_operator(D.toarray())
+    H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
+    Id_n_p = SparsePauliOp.from_list([(n_p * 'I', 1)])
 
-    H_pauli_list = []
+    H = []
 
     # Hermitian part
-    for j in range(len(H_2_pauli_list)):
-        for k in range(len(D_pauli_list)):
-            H_pauli_list.append((n_p * 'I' + H_2_pauli_list[j][0] + D_pauli_list[k][0], -(H_2_pauli_list[j][1] * D_pauli_list[k][1]).real))
-            H_pauli_list.append((n_p * 'I' + D_pauli_list[k][0] + H_2_pauli_list[j][0], -(H_2_pauli_list[j][1] * D_pauli_list[k][1]).real))
+    for j in range(len(H_1_pauli_op_grouped)):
+        H.append(H_1_pauli_op_grouped[j].tensor(D_pauli_op).tensor(H_F_pauli_op))
+        H.append(D_pauli_op.tensor(H_1_pauli_op_grouped[j]).tensor(H_F_pauli_op))
     # Anti-Hermitian part
-    for i in range(len(H_F_pauli_list)):
-        for j in range(len(H_1_pauli_list)):
-            for k in range(len(D_pauli_list)):
-                H_pauli_list.append((H_F_pauli_list[i][0] + H_1_pauli_list[j][0] + D_pauli_list[k][0], (H_F_pauli_list[i][1] * H_1_pauli_list[j][1] * D_pauli_list[k][1]).real))
-                H_pauli_list.append((H_F_pauli_list[i][0] + D_pauli_list[k][0] + H_1_pauli_list[j][0], (H_F_pauli_list[i][1] * H_1_pauli_list[j][1] * D_pauli_list[k][1]).real))
+    for j in range(len(H_2_pauli_op_grouped)):
+        H.append(H_2_pauli_op_grouped[j].tensor(D_pauli_op).tensor(Id_n_p))
+        H.append(D_pauli_op.tensor(H_2_pauli_op_grouped[j]).tensor(Id_n_p))
 
-    H = SparsePauliOp.from_list(H_pauli_list)
     return H
 
 def get_H_one_hot(N, n_p, R):
@@ -129,23 +126,23 @@ def get_H_one_hot(N, n_p, R):
         op[j] = 'Z'
         D_pauli_list.append((''.join(op), -0.5 * D[j,j].real))
 
-    H_F_pauli_list = (-get_xi_pauli_op(n_p, R)).to_list()
-
-    H_pauli_list = []
+    H_1_pauli_op_grouped = SparsePauliOp.from_list(H_1_pauli_list).group_commuting()
+    H_2_pauli_op_grouped = SparsePauliOp.from_list(H_2_pauli_list).group_commuting()
+    D_pauli_op = SparsePauliOp.from_list(D_pauli_list)
+    H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
+    Id_n_p = SparsePauliOp.from_list([(n_p * 'I', 1)])
+    
+    H = []
 
     # Hermitian part
-    for j in range(len(H_2_pauli_list)):
-        for k in range(len(D_pauli_list)):
-            H_pauli_list.append((n_p * 'I' + H_2_pauli_list[j][0] + D_pauli_list[k][0], -(H_2_pauli_list[j][1] * D_pauli_list[k][1]).real))
-            H_pauli_list.append((n_p * 'I' + D_pauli_list[k][0] + H_2_pauli_list[j][0], -(H_2_pauli_list[j][1] * D_pauli_list[k][1]).real))
+    for j in range(len(H_1_pauli_op_grouped)):
+        H.append(H_1_pauli_op_grouped[j].tensor(D_pauli_op).tensor(H_F_pauli_op))
+        H.append(D_pauli_op.tensor(H_1_pauli_op_grouped[j]).tensor(H_F_pauli_op))
     # Anti-Hermitian part
-    for i in range(len(H_F_pauli_list)):
-        for j in range(len(H_1_pauli_list)):
-            for k in range(len(D_pauli_list)):
-                H_pauli_list.append((H_F_pauli_list[i][0] + H_1_pauli_list[j][0] + D_pauli_list[k][0], (H_F_pauli_list[i][1] * H_1_pauli_list[j][1] * D_pauli_list[k][1]).real))
-                H_pauli_list.append((H_F_pauli_list[i][0] + D_pauli_list[k][0] + H_1_pauli_list[j][0], (H_F_pauli_list[i][1] * H_1_pauli_list[j][1] * D_pauli_list[k][1]).real))
+    for j in range(len(H_2_pauli_op_grouped)):
+        H.append(H_2_pauli_op_grouped[j].tensor(D_pauli_op).tensor(Id_n_p))
+        H.append(D_pauli_op.tensor(H_2_pauli_op_grouped[j]).tensor(Id_n_p))
 
-    H = SparsePauliOp.from_list(H_pauli_list)
     return H
 
 # def get_gate_count_per_trotter_step_std_binary(H, trotter_method="second_order"):
@@ -192,7 +189,7 @@ def get_gate_count_per_trotter_step(H, trotter_method="second_order"):
     if trotter_method == "first_order":
         return num_single_qubit_gates, num_two_qubit_gates
     elif trotter_method == "second_order":
-        return 2 * num_single_qubit_gates, num_two_qubit_gates
+        return 2 * num_single_qubit_gates, 2 * num_two_qubit_gates
 
 def accumulator_sum(generator):
     result = 0
@@ -264,10 +261,11 @@ if __name__ == "__main__":
     pauli_basis_single_qubit_gates, pauli_basis_two_qubit_gates = get_gate_count_per_trotter_step(H_std_binary, trotter_method)
     one_hot_single_qubit_gates, one_hot_two_qubit_gates = get_gate_count_per_trotter_step(H_one_hot, trotter_method)
 
-    '''Schrodingerization w/ Pauli basis'''
+    print("Computing Trotter steps for Pauli basis.")
     pauli_basis_trotter_steps = get_second_order_trotter_steps(T, H_std_binary, error_tols)
 
     '''One-hot encoding (ours)'''
+    print("Computing Trotter steps for one-hot encoding.")
     one_hot_trotter_steps = get_second_order_trotter_steps(T, H_one_hot, error_tols)
 
     np.savez(join("../resource_analysis_data", f"fig2_nonseparable_data_{trotter_method}.npz"),
