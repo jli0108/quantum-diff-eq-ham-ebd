@@ -39,6 +39,7 @@ def get_xi_pauli_op(n_p, R):
 
 def get_H_std_binary(N, n_p, R):
     h = 1 / N
+    N_p = 2 ** n_p
 
     F_x = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
@@ -47,21 +48,24 @@ def get_H_std_binary(N, n_p, R):
     F_x /= h
 
     F_p = lil_matrix((N, N), dtype=np.complex128)
+    p_vals = np.linspace(-1, 1, N, endpoint=False)
     for j in range(N):
-        p = j / N
-        F_p[j,(j+1)%N] = (p * (1-p) + 1)
-        F_p[j,j] = - (p * (1-p) + 1)
+        p = p_vals[j]
+        F_p[j,(j+1)%N] = (p**3*(1-p**2)+1)
+        F_p[j,j] = - (p**3*(1-p**2)+1)
     F_p /= h
 
     D_x = lil_matrix((N, N), dtype=np.complex128)
+    x_vals = np.linspace(-1, 1, N, endpoint=False)
     for j in range(N):
-        x = j / N
-        D_x[j,j] = x * (1-x) + 1
+        x = x_vals[j]
+        D_x[j,j] = x**3 * (1-x**2) + 1
 
     D_p = lil_matrix((N, N), dtype=np.complex128)
+    p_vals = np.linspace(-1, 1, N, endpoint=False)
     for j in range(N):
-        p = j / N
-        D_p[j,j] = p
+        p = p_vals[j]
+        D_p[j,j] = p ** 3 * (1 - p ** 4)
 
 
     F_x_1 = (F_x + np.conj(F_x.T)) / 2
@@ -69,10 +73,10 @@ def get_H_std_binary(N, n_p, R):
     F_p_1 = (F_p + np.conj(F_p.T)) / 2
     F_p_2 = (F_p - np.conj(F_p.T)) / 2j
 
-    F_x_1_pauli_op_grouped = SparsePauliOp.from_operator(F_x_1.toarray()).group_commuting()
-    F_x_2_pauli_op_grouped = SparsePauliOp.from_operator(F_x_2.toarray()).group_commuting()
-    F_p_1_pauli_op_grouped = SparsePauliOp.from_operator(F_p_1.toarray()).group_commuting()
-    F_p_2_pauli_op_grouped = SparsePauliOp.from_operator(F_p_2.toarray()).group_commuting()
+    F_x_1_pauli_op_grouped = SparsePauliOp.from_operator(F_x_1.toarray()).simplify().group_commuting()
+    F_x_2_pauli_op_grouped = SparsePauliOp.from_operator(F_x_2.toarray()).simplify().group_commuting()
+    F_p_1_pauli_op_grouped = SparsePauliOp.from_operator(F_p_1.toarray()).simplify().group_commuting()
+    F_p_2_pauli_op_grouped = SparsePauliOp.from_operator(F_p_2.toarray()).simplify().group_commuting()
     D_x_pauli_op = SparsePauliOp.from_operator(D_x.toarray())
     D_p_pauli_op = SparsePauliOp.from_operator(D_p.toarray())
     H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
@@ -142,21 +146,24 @@ def get_H_one_hot(N, n_p, R):
     F_x /= h
 
     F_p = lil_matrix((N, N), dtype=np.complex128)
+    p_vals = np.linspace(-1, 1, N, endpoint=False)
     for j in range(N):
-        p = j / N
-        F_p[j,(j+1)%N] = (p * (1-p) + 1)
-        F_p[j,j] = - (p * (1-p) + 1)
+        p = p_vals[j]
+        F_p[j,(j+1)%N] = (p**3*(1-p**2)+1)
+        F_p[j,j] = - (p**3*(1-p**2)+1)
     F_p /= h
 
     D_x = lil_matrix((N, N), dtype=np.complex128)
+    x_vals = np.linspace(-1, 1, N, endpoint=False)
     for j in range(N):
-        x = j / N
-        D_x[j,j] = x * (1-x) + 1
+        x = x_vals[j]
+        D_x[j,j] = x**3 * (1-x**2) + 1
 
     D_p = lil_matrix((N, N), dtype=np.complex128)
+    p_vals = np.linspace(-1, 1, N, endpoint=False)
     for j in range(N):
-        p = j / N
-        D_p[j,j] = p
+        p = p_vals[j]
+        D_p[j,j] = p ** 3 * (1 - p ** 4)
 
 
     F_x_1 = (F_x + np.conj(F_x.T)) / 2
@@ -206,12 +213,12 @@ def get_H_one_hot(N, n_p, R):
         F_x_2_pauli_list.append((''.join(op), -0.5*F_x_2[(j+1)%N,j].imag))
         F_p_2_pauli_list.append((''.join(op), -0.5*F_p_2[(j+1)%N,j].imag))
 
-        F_x_1_pauli_list.append((N * 'I', 0.5 * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((N * 'I', 0.5 * F_p_1[j,j].real))
+        F_x_2_pauli_list.append((N * 'I', 0.5 * F_x_1[j,j].real))
+        F_p_2_pauli_list.append((N * 'I', 0.5 * F_p_1[j,j].real))
         op = N * ['I']
         op[j] = 'Z'
-        F_x_1_pauli_list.append((''.join(op), -0.5 * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((''.join(op), -0.5 * F_p_1[j,j].real))
+        F_x_2_pauli_list.append((''.join(op), -0.5 * F_x_1[j,j].real))
+        F_p_2_pauli_list.append((''.join(op), -0.5 * F_p_1[j,j].real))
 
     for j in range(N):
         D_x_pauli_list.append((N * 'I', 0.5 * D_x[j,j].real))
@@ -224,12 +231,12 @@ def get_H_one_hot(N, n_p, R):
         op[j] = 'Z'
         D_p_pauli_list.append((''.join(op), -0.5 * D_p[j,j].real))
 
-    F_x_1_pauli_op_grouped = SparsePauliOp.from_list(F_x_1_pauli_list).group_commuting()
-    F_x_2_pauli_op_grouped = SparsePauliOp.from_list(F_x_2_pauli_list).group_commuting()
-    F_p_1_pauli_op_grouped = SparsePauliOp.from_list(F_p_1_pauli_list).group_commuting()
-    F_p_2_pauli_op_grouped = SparsePauliOp.from_list(F_p_2_pauli_list).group_commuting()
-    D_x_pauli_op = SparsePauliOp.from_list(D_x_pauli_list)
-    D_p_pauli_op = SparsePauliOp.from_list(D_p_pauli_list)
+    F_x_1_pauli_op_grouped = SparsePauliOp.from_list(F_x_1_pauli_list).simplify().group_commuting()
+    F_x_2_pauli_op_grouped = SparsePauliOp.from_list(F_x_2_pauli_list).simplify().group_commuting()
+    F_p_1_pauli_op_grouped = SparsePauliOp.from_list(F_p_1_pauli_list).simplify().group_commuting()
+    F_p_2_pauli_op_grouped = SparsePauliOp.from_list(F_p_2_pauli_list).simplify().group_commuting()
+    D_x_pauli_op = SparsePauliOp.from_list(D_x_pauli_list).simplify()
+    D_p_pauli_op = SparsePauliOp.from_list(D_p_pauli_list).simplify()
     H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
     Id_n_p = SparsePauliOp.from_list([(n_p * 'I', 1)])
 

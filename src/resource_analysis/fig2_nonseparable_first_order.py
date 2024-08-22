@@ -40,24 +40,25 @@ def get_H_std_binary(N, n_p, R):
     h = 1 / N
 
     A = lil_matrix((N, N), dtype=np.complex128)
+    x_vals = np.linspace(-1, 1, N, endpoint=False)
     for j in range(N):
-        x = j / N
-        A[j,(j+1)%N] = (x * (1-x) + 1)
-        A[j,j] = - (x * (1-x) + 1)
+        x = x_vals[j]
+        A[j,(j+1)%N] = (x**3*(1-x**2)+1)
+        A[j,j] = - (x**3*(1-x**2)+1)
     A /= h
 
     D = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
-        x = j / N
-        D[j,j] = 1 + x * (1 - x)
+        x = x_vals[j]
+        D[j,j] = (x**3*(1-x**2)+1)
 
     H_1 = (A + np.conj(A.T)) / 2
     H_2 = (A - np.conj(A.T)) / 2j
 
-    H_1_pauli_op_grouped = SparsePauliOp.from_operator(H_1.toarray()).group_commuting()
-    H_2_pauli_op_grouped = SparsePauliOp.from_operator(H_2.toarray()).group_commuting()
+    H_1_pauli_op_grouped = SparsePauliOp.from_operator(H_1.toarray()).simplify().group_commuting()
+    H_2_pauli_op_grouped = SparsePauliOp.from_operator(H_2.toarray()).simplify().group_commuting()
     
-    D_pauli_op = SparsePauliOp.from_operator(D.toarray())
+    D_pauli_op = SparsePauliOp.from_operator(D.toarray()).simplify()
     H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
     Id_n_p = SparsePauliOp.from_list([(n_p * 'I', 1)])
 
@@ -114,16 +115,17 @@ def get_H_one_hot(N, n_p, R):
     N_p = 2 ** n_p
 
     A = lil_matrix((N, N), dtype=np.complex128)
+    x_vals = np.linspace(-1, 1, N, endpoint=False)
     for j in range(N):
-        x = j / N
-        A[j,(j+1)%N] = (x * (1-x) + 1)
-        A[j,j] = - (x * (1-x) + 1)
+        x = x_vals[j]
+        A[j,(j+1)%N] = (x**3*(1-x**2)+1)
+        A[j,j] = - (x**3*(1-x**2)+1)
     A /= h
 
     D = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
-        x = j / N
-        D[j,j] = 1 + x * (1 - x)
+        x = x_vals[j]
+        D[j,j] = (x**3*(1-x**2)+1)
 
     H_1 = (A + np.conj(A.T)) / 2
     H_2 = (A - np.conj(A.T)) / 2j
@@ -171,9 +173,9 @@ def get_H_one_hot(N, n_p, R):
         op[j] = 'Z'
         D_pauli_list.append((''.join(op), -0.5 * D[j,j].real))
 
-    H_1_pauli_op_grouped = SparsePauliOp.from_list(H_1_pauli_list).group_commuting()
-    H_2_pauli_op_grouped = SparsePauliOp.from_list(H_2_pauli_list).group_commuting()
-    D_pauli_op = SparsePauliOp.from_list(D_pauli_list)
+    H_1_pauli_op_grouped = SparsePauliOp.from_list(H_1_pauli_list).simplify().group_commuting()
+    H_2_pauli_op_grouped = SparsePauliOp.from_list(H_2_pauli_list).simplify().group_commuting()
+    D_pauli_op = SparsePauliOp.from_list(D_pauli_list).simplify()
     H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
     Id_n_p = SparsePauliOp.from_list([(n_p * 'I', 1)])
     
