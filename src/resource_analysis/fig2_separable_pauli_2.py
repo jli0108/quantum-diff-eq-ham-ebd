@@ -52,22 +52,23 @@ if __name__ == "__main__":
     pauli_basis_single_qubit_gates, pauli_basis_two_qubit_gates, pauli_basis_circ_depth = pauli_basis_gate_count_per_trotter_step(n_x, n_p, R, T, trotter_method)
 
     for dim_idx, dimension in enumerate(dimensions):
-        for error_tol_idx, error_tol in enumerate(error_tols):
-            print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}", flush=True)
+        if 4 <= dim_idx < 6:
+            for error_tol_idx, error_tol in enumerate(error_tols):
+                print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}", flush=True)
 
-            '''Schrodingerization w/ Pauli basis'''
-            pauli_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_pauli_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
-            print("Pauli basis Trotter steps:", pauli_basis_trotter_steps[dim_idx, error_tol_idx], flush=True)
+                '''Schrodingerization w/ Pauli basis'''
+                pauli_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_pauli_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
+                print("Pauli basis Trotter steps:", pauli_basis_trotter_steps[dim_idx, error_tol_idx], flush=True)
 
-    #         # '''Schrodingerization w/ Bell basis'''
-    #         # bell_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_bell_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
-    #         # print("Bell basis Trotter steps:", bell_basis_trotter_steps[dim_idx, error_tol_idx], flush=True)
-            
-    #         # '''One-hot encoding (ours)'''
-    #         # one_hot_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_one_hot(N, N_p, R, T, error_tol / dimension, num_samples, num_jobs)
-    #         # print("One-hot Trotter steps:", one_hot_trotter_steps[dim_idx, error_tol_idx], flush=True)
+        #         # '''Schrodingerization w/ Bell basis'''
+        #         # bell_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_bell_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
+        #         # print("Bell basis Trotter steps:", bell_basis_trotter_steps[dim_idx, error_tol_idx], flush=True)
+                
+        #         # '''One-hot encoding (ours)'''
+        #         # one_hot_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_one_hot(N, N_p, R, T, error_tol / dimension, num_samples, num_jobs)
+        #         # print("One-hot Trotter steps:", one_hot_trotter_steps[dim_idx, error_tol_idx], flush=True)
 
-    np.savez(join("../resource_analysis_data", "fig2_separable_pauli_data.npz"),
+    np.savez(join("../resource_analysis_data", "fig2_separable_pauli_data_2.npz"),
             dimensions=dimensions,
             error_tols=error_tols,
             pauli_basis_trotter_steps=pauli_basis_trotter_steps,

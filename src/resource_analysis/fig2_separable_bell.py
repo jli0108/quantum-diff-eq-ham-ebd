@@ -49,10 +49,7 @@ if __name__ == "__main__":
     # one_hot_trotter_steps = np.zeros((len(dimensions), len(error_tols)))
 
     # Gate counts per Trotter step
-    # pauli_basis_single_qubit_gates, pauli_basis_two_qubit_gates = pauli_basis_gate_count_per_trotter_step(n_x, n_p, R, T)
-    bell_basis_single_qubit_gates, bell_basis_two_qubit_gates = bell_basis_gate_count_per_trotter_step(n_x, n_p, R, T)
-    # one_hot_single_qubit_gates, one_hot_two_qubit_gates = one_hot_gate_count_per_trotter_step(N, n_p, R, trotter_method)
-
+    bell_basis_single_qubit_gates, bell_basis_two_qubit_gates, bell_basis_circ_depth = bell_basis_gate_count_per_trotter_step(n_x, n_p, R, T)
     for dim_idx, dimension in enumerate(dimensions):
         for error_tol_idx, error_tol in enumerate(error_tols):
             print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}", flush=True)
@@ -74,7 +71,8 @@ if __name__ == "__main__":
             error_tols=error_tols,
             bell_basis_trotter_steps=bell_basis_trotter_steps,
             bell_basis_single_qubit_gates=bell_basis_single_qubit_gates,
-            bell_basis_two_qubit_gates=bell_basis_two_qubit_gates)
+            bell_basis_two_qubit_gates=bell_basis_two_qubit_gates,
+            bell_basis_circ_depth=bell_basis_circ_depth)
 
     end_time = time()
     print(f"Runtime: {end_time - start_time}", flush=True)

@@ -229,59 +229,49 @@ def get_gate_count_per_trotter_step(H, trotter_method="second_order"):
         return num_single_qubit_gates, num_two_qubit_gates
     elif trotter_method == "second_order":
         return 2 * num_single_qubit_gates, 2 * num_two_qubit_gates
-    
-def get_circuit_depth(n, H):
-    L = len(H)
-    depth = 0
-    for j in range(L):
-        circuit = QuantumCircuit(n)
-        for pauli_op in H[j]:
-            circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op)), qargs=np.arange(n).tolist())
-        compiled_circ = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-        depth += compiled_circ.depth()
 
-    return depth
 
-def sparse_comm(H1, H2):
-    return H1 @ H2 - H2 @ H1
+def get_first_order_trotter_steps(t, H_sp_mats, epsilon):
 
-def get_first_order_trotter_steps(t, H, epsilon):
-    L = len(H)
-    coeff = 0
-    for j in range(L-1):
-        print(f"Computing Trotter steps: [{j} / {L-1}]", end="\r", flush=True)
-        comm_term = 0
-        for k in np.arange(j+1, L):
-            comm_term += sparse_comm(H[j], H[k])
-        coeff += estimate_spectral_norm(comm_term)
-    print(f"Computing Trotter steps: [{L-1} / {L-1}]", flush=True)
-    return np.ceil((t ** 2 * coeff / (2 * epsilon)))
+    # Binary search to find Trotter number
+    r_min, r_max = 1, 10
+    while r_max * get_one_step_trotter_error(t / r_max, H_sp_mats) > epsilon:
+        r_max *= 2
 
-def get_second_order_trotter_steps(t, H, epsilon):
-    L = len(H)
-    coeff = 0
-    for j in range(L-1):
-        print(f"Computing Trotter steps: [{j} / {L-1}]", end="\r", flush=True)
-        comm_term = 0
-        for k in np.arange(j+1, L):
-            for l in np.arange(j+1, L):
-                comm_term += sparse_comm(H[l], sparse_comm(H[k], H[j]))
-        coeff += estimate_spectral_norm(comm_term)
+    # binary search for r
+    while r_max - r_min > 1:
+        r = (r_min + r_max) // 2
+        if r * get_one_step_trotter_error(t / r_max, H_sp_mats) > epsilon:
+            r_min = r
+        else:
+            r_max = r
+    return r_max
 
-        comm_term = 0
-        for k in np.arange(j+1, L):
-            comm_term += sparse_comm(H[j], sparse_comm(H[j], H[k]))
-        coeff += 0.5 * estimate_spectral_norm(comm_term)
-    print(f"Computing Trotter steps: [{L-1} / {L-1}]", flush=True)
+def get_one_step_trotter_error(dt, H_sp_mats, num_jobs=16, num_samples=1000):
+    return max(Parallel(n_jobs=num_jobs)(delayed(get_one_step_trotter_error_one_sample)(dt, H_sp_mats) for _ in range(num_samples)))
 
-    return np.ceil(np.sqrt(t ** 3 * coeff / (12 * epsilon)))
+def get_one_step_trotter_error_one_sample(dt, H_sp_mats):
+    dim = H_sp_mats[0].shape[0]
+    psi_0 = np.random.randn(dim) + 1j * np.random.randn(dim)
+    psi_0 /= np.linalg.norm(psi_0)
+    H = 0
+    for j in range(len(H_sp_mats)):
+        H += H_sp_mats[j]
+
+    psi_no_trotter = expm_multiply(-1j * dt * H, psi_0)
+    psi_trotter = np.copy(psi_0)
+
+    for j in range(len(H_sp_mats)):
+        psi_trotter = expm_multiply(-1j * dt * H_sp_mats[j], psi_trotter)
+
+    return np.linalg.norm(psi_no_trotter - psi_trotter, ord=2)
 
 if __name__ == "__main__":
 
     print("Running Fig 2 script (nonseparable)", flush=True)
     start_time = time()
     error_tols = np.exp(-np.linspace(np.log(10), np.log(1000), 10))
-    N = 128                                     # grid points along each dimension
+    N = 32                                     # grid points along each dimension
     n_x = int(np.log2(N))
     n_p = 5                                     # num qubits for p
     N_p = 2 ** n_p
@@ -299,30 +289,31 @@ if __name__ == "__main__":
     print("Getting Hamiltonian w/ Pauli basis.", flush=True)
     H_std_binary, H_std_binary_sp_mats = get_H_std_binary(N, n_p, R)
     print("Computing Trotter steps for Pauli basis.", flush=True)
-    pauli_basis_trotter_steps = get_first_order_trotter_steps(T, H_std_binary_sp_mats, error_tols)
+    for j, error_tol in enumerate(error_tols):
+        print("Error tol:", error_tol)
+        pauli_basis_trotter_steps[j] = get_first_order_trotter_steps(T, H_std_binary_sp_mats, error_tol)
     print("Computing gates per Trotter step for Pauli basis.", flush=True)
     pauli_basis_single_qubit_gates, pauli_basis_two_qubit_gates = get_gate_count_per_trotter_step(H_std_binary, trotter_method)
-    pauli_basis_circ_depth = get_circuit_depth(2 * n_x + n_p, H_std_binary)
 
     '''One-hot encoding (ours)'''
     print("Getting Hamiltonian w/ one-hot encoding.", flush=True)
     H_one_hot, H_one_hot_sp_mats = get_H_one_hot(N, n_p, R)
     print("Computing Trotter steps for one-hot encoding.", flush=True)
-    one_hot_trotter_steps = get_first_order_trotter_steps(T, H_one_hot_sp_mats, error_tols)
+    for j, error_tol in enumerate(error_tols):
+        print("Error tol:", error_tol)
+        one_hot_trotter_steps[j] = get_first_order_trotter_steps(T, H_one_hot_sp_mats, error_tol)
     print("Computing gates per Trotter step for one-hot.", flush=True)
     one_hot_single_qubit_gates, one_hot_two_qubit_gates = get_gate_count_per_trotter_step(H_one_hot, trotter_method)
-    one_hot_circ_depth = get_circuit_depth(2 * N + n_p, H_one_hot)
 
-    np.savez(join("../resource_analysis_data", f"fig2_nonseparable_data_{trotter_method}.npz"),
+
+    np.savez(join("../resource_analysis_data", f"fig2_nonseparable_data_{trotter_method}_2.npz"),
             error_tols=error_tols,
             pauli_basis_trotter_steps=pauli_basis_trotter_steps,
             pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates,
             pauli_basis_two_qubit_gates=pauli_basis_two_qubit_gates,
-            pauli_basis_circ_depth=pauli_basis_circ_depth,
             one_hot_trotter_steps=one_hot_trotter_steps,
             one_hot_single_qubit_gates=one_hot_single_qubit_gates,
-            one_hot_two_qubit_gates=one_hot_two_qubit_gates,
-            one_hot_circ_depth=one_hot_circ_depth)
+            one_hot_two_qubit_gates=one_hot_two_qubit_gates)
 
     end_time = time()
     print(f"Runtime: {end_time - start_time}", flush=True)

@@ -167,8 +167,8 @@ def one_hot_gate_count_per_trotter_step(N, n_p, R, trotter_method="second_order"
 
     # Gates per Trotter step
     num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-
-    return num_single_qubit_gates, num_two_qubit_gates
+    depth = tket_circuit.depth()
+    return num_single_qubit_gates, num_two_qubit_gates, depth
 
 def get_mcrz(n, theta):
     circ = QuantumCircuit(n)
@@ -412,9 +412,8 @@ def bell_basis_gate_count_per_trotter_step(n_x, n_p, R, dt):
 
     # Gates per Trotter step
     num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-    # print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}")
-
-    return num_single_qubit_gates, num_two_qubit_gates
+    depth = tket_circuit.depth()
+    return num_single_qubit_gates, num_two_qubit_gates, depth
 
 def get_trotter_number_pauli_basis(n, n_p, R, T, error_tol, num_samples, num_jobs):
     # Binary search to find Trotter number
@@ -516,6 +515,5 @@ def pauli_basis_gate_count_per_trotter_step(n_x, n_p, R, dt, trotter_method):
 
     # Gates per Trotter step
     num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-    # print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}")
-
-    return num_single_qubit_gates, num_two_qubit_gates
+    depth = tket_circuit.depth()
+    return num_single_qubit_gates, num_two_qubit_gates, depth

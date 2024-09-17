@@ -307,6 +307,18 @@ def get_gate_count_per_trotter_step(H, trotter_method="second_order"):
         return num_single_qubit_gates, num_two_qubit_gates
     elif trotter_method == "second_order":
         return 2 * num_single_qubit_gates, 2 * num_two_qubit_gates
+    
+def get_circuit_depth(n, H):
+    L = len(H)
+    depth = 0
+    for j in range(L):
+        circuit = QuantumCircuit(n)
+        for pauli_op in H[j]:
+            circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op)), qargs=np.arange(n).tolist())
+        compiled_circ = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+        depth += compiled_circ.depth()
+
+    return depth
 
 def sparse_comm(H1, H2):
     return H1 @ H2 - H2 @ H1
@@ -367,22 +379,26 @@ if __name__ == "__main__":
     pauli_basis_trotter_steps = get_first_order_trotter_steps(T, H_std_binary_sp_mats, error_tols)
     print("Computing gates per Trotter step for Pauli basis.", flush=True)
     pauli_basis_single_qubit_gates, pauli_basis_two_qubit_gates = get_gate_count_per_trotter_step(H_std_binary, trotter_method)
-
+    pauli_basis_circ_depth = get_circuit_depth(2 * n_x + n_p, H_std_binary)
+    
     '''One-hot encoding (ours)'''
     H_one_hot, H_one_hot_sp_mats = get_H_one_hot(N, n_p, R)
     print("Computing Trotter steps for one-hot encoding.", flush=True)
     one_hot_trotter_steps = get_first_order_trotter_steps(T, H_one_hot_sp_mats, error_tols)
     print("Computing gates per Trotter step for one-hot.", flush=True)
     one_hot_single_qubit_gates, one_hot_two_qubit_gates = get_gate_count_per_trotter_step(H_one_hot, trotter_method)
+    one_hot_circ_depth = get_circuit_depth(2 * N + n_p, H_one_hot)
 
     np.savez(join("../resource_analysis_data", f"nonlinear_data_{trotter_method}.npz"),
             error_tols=error_tols,
             pauli_basis_trotter_steps=pauli_basis_trotter_steps,
             pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates,
             pauli_basis_two_qubit_gates=pauli_basis_two_qubit_gates,
+            pauli_basis_circ_depth=pauli_basis_circ_depth,
             one_hot_trotter_steps=one_hot_trotter_steps,
             one_hot_single_qubit_gates=one_hot_single_qubit_gates,
-            one_hot_two_qubit_gates=one_hot_two_qubit_gates)
+            one_hot_two_qubit_gates=one_hot_two_qubit_gates,
+            one_hot_circ_depth=one_hot_circ_depth)
 
     end_time = time()
     print(f"Runtime: {end_time - start_time}", flush=True)
