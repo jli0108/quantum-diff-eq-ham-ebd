@@ -151,23 +151,31 @@ def one_hot_gate_count_per_trotter_step(N, n_p, R, trotter_method="second_order"
 
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
     elif trotter_method == "second_order":
-        circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
     else:
         raise ValueError(f"{trotter_method} not supported")
 
-    compiled_circuit = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    num_single_qubit_gates, num_two_qubit_gates = 0,0
 
-    tket_circuit = qiskit_to_tk(compiled_circuit)
-    gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
-    rebase = auto_rebase_pass(gateset) 
-    comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
-    comp.apply(tket_circuit)
+    ops = compiled_circuit.count_ops()
+    for op in ops:
+        if op == "rx" or op == "ry" or op == "rz":
+            num_single_qubit_gates += ops[op]
+        elif op == "rxx":
+            num_two_qubit_gates += ops[op]
+    
+    # tket_circuit = qiskit_to_tk(compiled_circuit)
+    # gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
+    # rebase = auto_rebase_pass(gateset) 
+    # comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
+    # comp.apply(tket_circuit)
 
     # Gates per Trotter step
-    num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-    depth = tket_circuit.depth()
+    # num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
+    depth = compiled_circuit.depth()
     return num_single_qubit_gates, num_two_qubit_gates, depth
 
 def get_mcrz(n, theta):
@@ -403,16 +411,26 @@ def bell_basis_gate_count_per_trotter_step(n_x, n_p, R, dt):
 
 
     # Compile and optimize circuit
+    
     compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-    tket_circuit = qiskit_to_tk(compiled_circuit)
-    gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
-    rebase = auto_rebase_pass(gateset) 
-    comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
-    comp.apply(tket_circuit)
+    num_single_qubit_gates, num_two_qubit_gates = 0,0
+
+    ops = compiled_circuit.count_ops()
+    for op in ops:
+        if op == "rx" or op == "ry" or op == "rz":
+            num_single_qubit_gates += ops[op]
+        elif op == "rxx":
+            num_two_qubit_gates += ops[op]
+    
+    # tket_circuit = qiskit_to_tk(compiled_circuit)
+    # gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
+    # rebase = auto_rebase_pass(gateset) 
+    # comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
+    # comp.apply(tket_circuit)
 
     # Gates per Trotter step
-    num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-    depth = tket_circuit.depth()
+    # num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
+    depth = compiled_circuit.depth()
     return num_single_qubit_gates, num_two_qubit_gates, depth
 
 def get_trotter_number_pauli_basis(n, n_p, R, T, error_tol, num_samples, num_jobs):
@@ -507,13 +525,22 @@ def pauli_basis_gate_count_per_trotter_step(n_x, n_p, R, dt, trotter_method):
 
     # Compile and optimize circuit
     compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-    tket_circuit = qiskit_to_tk(compiled_circuit)
-    gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
-    rebase = auto_rebase_pass(gateset) 
-    comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
-    comp.apply(tket_circuit)
+    num_single_qubit_gates, num_two_qubit_gates = 0,0
+
+    ops = compiled_circuit.count_ops()
+    for op in ops:
+        if op == "rx" or op == "ry" or op == "rz":
+            num_single_qubit_gates += ops[op]
+        elif op == "rxx":
+            num_two_qubit_gates += ops[op]
+    
+    # tket_circuit = qiskit_to_tk(compiled_circuit)
+    # gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
+    # rebase = auto_rebase_pass(gateset) 
+    # comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
+    # comp.apply(tket_circuit)
 
     # Gates per Trotter step
-    num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-    depth = tket_circuit.depth()
+    # num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
+    depth = compiled_circuit.depth()
     return num_single_qubit_gates, num_two_qubit_gates, depth
