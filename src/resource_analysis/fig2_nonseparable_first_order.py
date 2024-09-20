@@ -281,7 +281,7 @@ if __name__ == "__main__":
     print("Running Fig 2 script (nonseparable)", flush=True)
     start_time = time()
     error_tols = np.exp(-np.linspace(np.log(10), np.log(1000), 10))
-    N = 128                                     # grid points along each dimension
+    N = 64                                     # grid points along each dimension
     n_x = int(np.log2(N))
     n_p = 5                                     # num qubits for p
     N_p = 2 ** n_p
