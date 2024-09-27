@@ -1,4 +1,3 @@
-
 import numpy as np
 
 from scipy.sparse import eye, lil_matrix, diags
@@ -11,6 +10,7 @@ from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter, SuzukiTrotter
 from qiskit import transpile
+from qiskit.transpiler.passes import RemoveBarriers
 from qiskit.circuit.library import PauliEvolutionGate
 from pytket import OpType
 from pytket.passes import RemoveRedundancies, CommuteThroughMultis, SequencePass, FullPeepholeOptimise, auto_rebase_pass
@@ -22,6 +22,7 @@ from os.path import join
 import sys
 sys.path.append(join(".", ".."))
 from utils import *
+
 
 def estimate_one_step_trotter_error(N, N_p, R, dt, num_samples=1000, num_jobs=16):
 
@@ -387,22 +388,142 @@ def bell_basis_gate_count_per_trotter_step(n_x, n_p, R, dt):
     # Anti-Hermitian part (controlled simulation)
     lamb = 0
     # Controlled simulation
-    for j in range(n_p - 1):
-        second_order_v_circ = QuantumCircuit(n_x)
-        # print((np.pi / R) * (2 ** j))
-        second_order_v_circ.append(get_v_circ(n_x, lamb, 0.5 * (np.pi / R) * (2 ** j) * dt, order="forward"), qargs=np.arange(n_x).tolist())
-        second_order_v_circ.append(get_v_circ(n_x, lamb, 0.5 * (np.pi / R) * (2 ** j) * dt, order="backward"), qargs=np.arange(n_x).tolist())
-        trot_circuit.append(transpile(second_order_v_circ, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[j], np.arange(n_p, n_x+n_p)]).tolist())
+    for i in range(n_p - 1):
+        '''get_v_circ'''
+        T_v = 0.5 * (np.pi / R) * (2 ** i) * dt
+        # print(T_v)
+        n = n_x
+        h = 1 / N
 
-    second_order_v_circ = QuantumCircuit(n_x)
-    # print(- (np.pi / R) * (2 ** (n_p-1)))
-    second_order_v_circ.append(get_v_circ(n_x, lamb, - 0.5 * (np.pi / R) * (2 ** (n_p-1)) * dt, order="forward"), qargs=np.arange(n_x).tolist())
-    second_order_v_circ.append(get_v_circ(n_x, lamb, - 0.5 * (np.pi / R) * (2 ** (n_p-1)) * dt, order="backward"), qargs=np.arange(n_x).tolist())
-    trot_circuit.append(transpile(second_order_v_circ, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[n_p-1], np.arange(n_p, n_x+n_p)]).tolist())
+        for j in range(n):
+            '''get_w_circ'''
+            T_w = T_v / (2 * h)
+            if j == 0:
+                trot_circuit.p(-lamb, n_p+j)
+                trot_circuit.crx(2 * T_w, i, n_p+j)
+                trot_circuit.p(lamb, n_p+j)
+            else:
+                for k in range(j):
+                    trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+k)
+                trot_circuit.p(-lamb, n_p+j)
+                trot_circuit.h(n_p+j)
+
+                multi_controlled_rz = get_mcrz(j+1, 2 * T_w)
+                trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[i], np.arange(n_p, n_p+j+1)]).tolist())
+
+                trot_circuit.h(n_p+j)
+                trot_circuit.p(lamb, n_p+j)
+                for k in range(j):
+                    trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+j-1-k)
+
+        for j in range(n-1):
+            trot_circuit.cx(control_qubit=n_p+n-1, target_qubit=n_p+j)
+        trot_circuit.p(lamb, n_p+n-1)
+        trot_circuit.h(n_p+n-1)
+        for j in range(n-1):
+            trot_circuit.x(n_p+j)
+
+        multi_controlled_rz = get_mcrz(n, 4 * T_v / (2 * h))
+        trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[i], np.arange(n_p, n_x+n_p)]).tolist())
+
+        for j in range(n-1):
+            trot_circuit.x(n_p+j)
+        trot_circuit.h(n_p+n-1)
+        trot_circuit.p(-lamb, n_p+n-1)
+        for j in range(n-1):
+            trot_circuit.cx(control_qubit=n_p+n-1, target_qubit=n_p+n-2-j)
+
+        for j in range(n)[::-1]:
+            '''get_w_circ'''
+            T_w = T_v / (2 * h)
+            if j == 0:
+                trot_circuit.p(-lamb, n_p+j)
+                trot_circuit.crx(2 * T_w, i, n_p+j)
+                trot_circuit.p(lamb, n_p+j)
+            else:
+                for k in range(j):
+                    trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+k)
+                trot_circuit.p(-lamb, n_p+j)
+                trot_circuit.h(n_p+j)
+
+                # multi_controlled_rz = RZGate(2 * T).control(int(j))
+                multi_controlled_rz = get_mcrz(j+1, 2 * T_w)
+                trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[i], np.arange(n_p, n_p+j+1)]).tolist())
+
+                trot_circuit.h(n_p+j)
+                trot_circuit.p(lamb, n_p+j)
+                for k in range(j):
+                    trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+j-1-k)
+
+    T_v = - 0.5 * (np.pi / R) * (2 ** (n_p-1)) * dt
+    n = n_x
+    h = 1 / N
+
+    for j in range(n):
+        '''get_w_circ'''
+        T_w = T_v / (2 * h)
+        if j == 0:
+            trot_circuit.p(-lamb, n_p+j)
+            trot_circuit.crx(2 * T_w, n_p-1, n_p+j)
+            trot_circuit.p(lamb, n_p+j)
+        else:
+            for k in range(j):
+                trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+k)
+            trot_circuit.p(-lamb, n_p+j)
+            trot_circuit.h(n_p+j)
+
+            # multi_controlled_rz = RZGate(2 * T).control(int(j))
+            # print(2 * T_w)
+            multi_controlled_rz = get_mcrz(j+1, 2 * T_w)
+            trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[n_p-1], np.arange(n_p, n_p+j+1)]).tolist())
+
+            trot_circuit.h(n_p+j)
+            trot_circuit.p(lamb, n_p+j)
+            for k in range(j):
+                trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+j-1-k)
+
+    for j in range(n-1):
+        trot_circuit.cx(control_qubit=n_p+n-1, target_qubit=n_p+j)
+    trot_circuit.p(lamb, n_p+n-1)
+    trot_circuit.h(n_p+n-1)
+    for j in range(n-1):
+        trot_circuit.x(n_p+j)
+
+    multi_controlled_rz = get_mcrz(n, 4 * T_v / (2 * h))
+    trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[n_p-1], np.arange(n_p, n_x+n_p)]).tolist())
+
+    for j in range(n-1):
+        trot_circuit.x(n_p+j)
+    trot_circuit.h(n_p+n-1)
+    trot_circuit.p(-lamb, n_p+n-1)
+    for j in range(n-1):
+        trot_circuit.cx(control_qubit=n_p+n-1, target_qubit=n_p+n-2-j)
+
+    for j in range(n)[::-1]:
+        '''get_w_circ'''
+        T_w = T_v / (2 * h)
+        if j == 0:
+            trot_circuit.p(-lamb, n_p+j)
+            trot_circuit.crx(2 * T_w, n_p-1, n_p+j)
+            trot_circuit.p(lamb, n_p+j)
+        else:
+            for k in range(j):
+                trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+k)
+            trot_circuit.p(-lamb, n_p+j)
+            trot_circuit.h(n_p+j)
+
+            # multi_controlled_rz = RZGate(2 * T).control(int(j))
+            multi_controlled_rz = get_mcrz(j+1, 2 * T_w)
+            trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[n_p-1], np.arange(n_p, n_p+j+1)]).tolist())
+
+            trot_circuit.h(n_p+j)
+            trot_circuit.p(lamb, n_p+j)
+            for k in range(j):
+                trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+j-1-k)
 
     # Diagonal part
-    for j in range(n_p-1):
-        trot_circuit.p(dt * N * (np.pi / R) * (2 ** j), j)
+    for i in range(n_p-1):
+        trot_circuit.p(dt * N * (np.pi / R) * (2 ** i), i)
     trot_circuit.p(-dt * N * (np.pi / R) * (2 ** (n_p - 1)), n_p - 1)
 
     # Hermitian part
