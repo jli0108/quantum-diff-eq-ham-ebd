@@ -80,7 +80,7 @@ def estimate_one_step_trotter_error_one_sample(N, N_p, dt, H_1_diag, H_1_even, H
     error = np.linalg.norm(psi_no_trotter - psi_trotter)
     return error
 
-def get_trotter_number_one_hot(N, N_p, R, T, error_tol, num_samples=1000, num_jobs=16):
+def get_trotter_number_one_hot_or_unary(N, N_p, R, T, error_tol, num_samples=1000, num_jobs=16):
     r_min, r_max = 1, 10
     while r_max * estimate_one_step_trotter_error(N, N_p, R, T / r_max, num_samples, num_jobs) > error_tol:
         r_max *= 2
@@ -178,6 +178,118 @@ def one_hot_gate_count_per_trotter_step(N, n_p, R, trotter_method="second_order"
     # num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
     depth = compiled_circuit.depth()
     return num_single_qubit_gates, num_two_qubit_gates, depth
+
+def unary_gate_count_per_trotter_step(N, n_p, R, trotter_method="second_order"):
+    n = (N // 2)
+    '''Gets the structure for the circuit with a single Trotter step'''
+    H_1_pauli_list = []
+    H_2_pauli_list = []
+
+    op = n * ['I']
+    H_1_pauli_list.append((''.join(op), 1))
+    for j in range(N):
+        if 1 <= j <= N // 2:
+            # print(f"n_{j-1}^(1)")
+            a = 1
+        else:
+            # print(f"n_{j-1}^(0)")
+            a = 0
+
+        # print(f"X_{j}")
+        if n - 1 <= j < N - 1:
+            # print(f"n_{j+1}^(1)")
+            b = 1
+        else:
+            # print(f"n_{j+1}^(0)")
+            b = 0
+                
+        if j >= n:
+            c = 1
+        else:
+            c = 0
+
+        # Hermitian part
+        op = n * ['I']
+        op[j%n] = 'X'
+        H_1_pauli_list.append((''.join(op), (-1) ** c /4))
+
+        op = n * ['I']
+        op[j%n] = 'X'
+        op[(j-1)%n] = 'Z'
+        H_1_pauli_list.append((''.join(op), - (-1) ** (a+c) /4))
+
+        op = n * ['I']
+        op[j%n] = 'X'
+        op[(j+1)%n] = 'Z'
+        H_1_pauli_list.append((''.join(op), - (-1) ** (b+c) /4))
+
+        op = n * ['I']
+        op[(j-1)%n] = 'Z'
+        op[j%n] = 'X'
+        op[(j+1)%n] = 'Z'
+        H_1_pauli_list.append((''.join(op), (-1) ** (a+b+c) /4))
+    
+        # Anti-Hermitian part
+        op = n * ['I']
+        op[j%n] = 'Y'
+        H_2_pauli_list.append((''.join(op), (-1) ** c /4))
+
+        op = n * ['I']
+        op[j%n] = 'Y'
+        op[(j-1)%n] = 'Z'
+        H_2_pauli_list.append((''.join(op), - (-1) ** (a+c) /4))
+
+        op = n * ['I']
+        op[j%n] = 'Y'
+        op[(j+1)%n] = 'Z'
+        H_2_pauli_list.append((''.join(op), - (-1) ** (b+c) /4))
+
+        op = n * ['I']
+        op[(j-1)%n] = 'Z'
+        op[j%n] = 'Y'
+        op[(j+1)%n] = 'Z'
+        H_2_pauli_list.append((''.join(op), (-1) ** (a+b+c) /4))
+
+    xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
+
+    pauli_list = []
+    for i in range(len(H_1_pauli_list)):
+        for j in range(len(xi_pauli_list)):
+            pauli_list.append((H_1_pauli_list[i][0] + xi_pauli_list[j][0], -H_1_pauli_list[i][1] * xi_pauli_list[j][1]))
+    for i in range(len(H_2_pauli_list)):
+        pauli_list.append((H_2_pauli_list[i][0] + ''.join(n_p * ['I']), -H_2_pauli_list[i][1]))
+
+    pauli_op = SparsePauliOp.from_list(pauli_list)
+
+    # Compute number of gates per Trotter step
+    if trotter_method == "first_order" or trotter_method == "randomized_first_order":
+        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+    elif trotter_method == "second_order":
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+    else:
+        raise ValueError(f"{trotter_method} not supported")
+
+    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    num_single_qubit_gates, num_two_qubit_gates = 0,0
+
+    ops = compiled_circuit.count_ops()
+    for op in ops:
+        if op == "rx" or op == "ry" or op == "rz":
+            num_single_qubit_gates += ops[op]
+        elif op == "rxx":
+            num_two_qubit_gates += ops[op]
+    
+    # tket_circuit = qiskit_to_tk(compiled_circuit)
+    # gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
+    # rebase = auto_rebase_pass(gateset) 
+    # comp = SequencePass([FullPeepholeOptimise(), CommuteThroughMultis(), RemoveRedundancies(), rebase])
+    # comp.apply(tket_circuit)
+
+    # Gates per Trotter step
+    # num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
+    depth = compiled_circuit.depth()
+    return num_single_qubit_gates, num_two_qubit_gates, depth
+
 
 def get_mcrz(n, theta):
     circ = QuantumCircuit(n)

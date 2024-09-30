@@ -28,10 +28,10 @@ if __name__ == "__main__":
 
     print("Running Fig 2 script", flush=True)
     start_time = time()
-    dimensions = np.arange(1, 10)
-    error_tols = np.exp(-np.linspace(np.log(10), np.log(1000), 10))
-    N = 128                                     # grid points along each dimension
-    n_x = int(np.log2(N))
+    dimension = 2
+    error_tol = 5e-2
+    n_vals_bell_basis = np.arange(2, 9)
+    N_vals_bell_basis = 2 ** n_vals_bell_basis
     n_p = 5                                     # num qubits for p
     N_p = 2 ** n_p
     T = 1
@@ -40,39 +40,27 @@ if __name__ == "__main__":
     num_jobs = 16
     trotter_method="second_order"
 
-    print("Dimensions:", dimensions, flush=True)
-    print("Error tolerances:", error_tols, flush=True)
-
     print("Computing Trotter steps.")
-    # pauli_basis_trotter_steps = np.zeros((len(dimensions), len(error_tols)))
-    bell_basis_trotter_steps = np.zeros((len(dimensions), len(error_tols)))
-    # one_hot_trotter_steps = np.zeros((len(dimensions), len(error_tols)))
+    bell_basis_single_qubit_gates = np.zeros_like(N_vals_bell_basis)
+    bell_basis_two_qubit_gates = np.zeros_like(N_vals_bell_basis)
+    bell_basis_circ_depth = np.zeros_like(N_vals_bell_basis)
+    bell_basis_trotter_steps = np.zeros_like(N_vals_bell_basis)
 
     # Gate counts per Trotter step
-    bell_basis_single_qubit_gates, bell_basis_two_qubit_gates, bell_basis_circ_depth = bell_basis_gate_count_per_trotter_step(n_x, n_p, R, T)
-    for dim_idx, dimension in enumerate(dimensions):
-        for error_tol_idx, error_tol in enumerate(error_tols):
-            print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}", flush=True)
-
-            '''Schrodingerization w/ Pauli basis'''
-            # pauli_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_pauli_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
-            # print("Pauli basis Trotter steps:", pauli_basis_trotter_steps[dim_idx, error_tol_idx], flush=True)
-
-            '''Schrodingerization w/ Bell basis'''
-            bell_basis_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_bell_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
-            print("Bell basis Trotter steps:", bell_basis_trotter_steps[dim_idx, error_tol_idx], flush=True)
-            
-            '''One-hot encoding (ours)'''
-            # one_hot_trotter_steps[dim_idx, error_tol_idx] = get_trotter_number_one_hot(N, N_p, R, T, error_tol / dimension, num_samples, num_jobs)
-            # print("One-hot Trotter steps:", one_hot_trotter_steps[dim_idx, error_tol_idx], flush=True)
+    for i, n_x in enumerate(n_vals_bell_basis):
+        bell_basis_single_qubit_gates[i], bell_basis_two_qubit_gates[i], bell_basis_circ_depth[i] = bell_basis_gate_count_per_trotter_step(n_x, n_p, R, T)
+        '''Schrodingerization w/ Bell basis'''
+        bell_basis_trotter_steps[i] = get_trotter_number_bell_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
+        print("Bell basis Trotter steps:", bell_basis_trotter_steps[i], flush=True)
+                
 
     np.savez(join("../resource_analysis_data", "fig2_separable_bell_data.npz"),
-            dimensions=dimensions,
-            error_tols=error_tols,
-            bell_basis_trotter_steps=bell_basis_trotter_steps,
-            bell_basis_single_qubit_gates=bell_basis_single_qubit_gates,
-            bell_basis_two_qubit_gates=bell_basis_two_qubit_gates,
-            bell_basis_circ_depth=bell_basis_circ_depth)
+            n_vals_bell_basis=n_vals_bell_basis,
+            N_vals_bell_basis=N_vals_bell_basis,
+            bell_basis_trotter_steps=bell_basis_trotter_steps[:i+1],
+            bell_basis_single_qubit_gates=bell_basis_single_qubit_gates[:i+1],
+            bell_basis_two_qubit_gates=bell_basis_two_qubit_gates[:i+1],
+            bell_basis_circ_depth=bell_basis_circ_depth[:i+1])
 
     end_time = time()
     print(f"Runtime: {end_time - start_time}", flush=True)
