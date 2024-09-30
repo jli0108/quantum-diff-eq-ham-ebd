@@ -247,26 +247,31 @@ if __name__ == "__main__":
     print(f"Error tolerance: {error_tol : 0.4f}.")
     print(f"Method: {trotter_method}")
 
-    N_vals_binary = np.arange(3, 129)
+    n_vals_binary = np.arange(2, 9)
+    N_vals_binary = 2 ** n_vals_binary
     binary_trotter_steps = np.zeros(len(N_vals_binary), dtype=int)
     binary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
     binary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
+    binary_circ_depth_per_trotter_step = np.zeros(len(N_vals_binary), dtype=int)
 
-    n_vals_bell_basis = np.arange(2, 8)
+    n_vals_bell_basis = np.arange(2, 9)
     N_vals_bell_basis = 2 ** n_vals_bell_basis
     bell_basis_trotter_steps = np.zeros(len(N_vals_bell_basis), dtype=int)
     bell_basis_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_bell_basis), dtype=int)
     bell_basis_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_bell_basis), dtype=int)
+    bell_basis_circ_depth_per_trotter_step = np.zeros(len(N_vals_bell_basis), dtype=int)
 
-    N_vals_one_hot = np.arange(3, 129)
+    N_vals_one_hot = np.arange(4, 257, 2)
     one_hot_trotter_steps = np.zeros(len(N_vals_one_hot), dtype=int)
     one_hot_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
     one_hot_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
+    one_hot_circ_depth_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
 
-    N_vals_unary = np.arange(4, 129, 2)
+    N_vals_unary = np.arange(4, 257, 2)
     unary_trotter_steps = np.zeros(len(N_vals_unary), dtype=int)
     unary_one_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
     unary_two_qubit_gate_count_per_trotter_step = np.zeros(len(N_vals_unary), dtype=int)
+    unary_circ_depth_per_trotter_step = np.zeros(len(N_vals_one_hot), dtype=int)
 
 
     print("\nRunning resource estimation for standard binary encoding")
@@ -274,12 +279,12 @@ if __name__ == "__main__":
         T = 1
         start_time = time()
         print(f"N = {N}")
-        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_circ_depth_per_trotter_step, binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
+        binary_one_qubit_gate_count_per_trotter_step[i], binary_two_qubit_gate_count_per_trotter_step[i], binary_circ_depth_per_trotter_step[i], binary_trotter_steps[i] = get_binary_resource_estimate(N, T, dimension, error_tol, trotter_method, num_samples, num_jobs)
 
         np.savez(join(CURR_DIR, f"std_binary_{trotter_method}.npz"),
                 N_vals_binary=N_vals_binary[:i+1],
                 binary_trotter_steps=binary_trotter_steps[:i+1],
-                binary_circ_depth_per_trotter_step=binary_circ_depth_per_trotter_step,
+                binary_circ_depth_per_trotter_step=binary_circ_depth_per_trotter_step[:i+1],
                 binary_one_qubit_gate_count_per_trotter_step=binary_one_qubit_gate_count_per_trotter_step[:i+1],
                 binary_two_qubit_gate_count_per_trotter_step=binary_two_qubit_gate_count_per_trotter_step[:i+1])
         
@@ -336,11 +341,11 @@ if __name__ == "__main__":
             elif op == "rxx":
                 num_two_qubit_gates += ops[op]
         
-        bell_basis_circ_depth_per_trotter_step = compiled_circuit.depth()
+        bell_basis_circ_depth_per_trotter_step[i] = compiled_circuit.depth()
 
         # Gates per Trotter step
         # num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}, depth: {bell_basis_circ_depth_per_trotter_step}")
+        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}, depth: {bell_basis_circ_depth_per_trotter_step[i]}")
 
         bell_basis_trotter_steps[i] = r_max
         bell_basis_one_qubit_gate_count_per_trotter_step[i] = dimension * num_single_qubit_gates
@@ -350,7 +355,7 @@ if __name__ == "__main__":
                 n_vals_bell_basis=n_vals_bell_basis[:i+1],
                 N_vals_bell_basis=N_vals_bell_basis[:i+1],
                 bell_basis_trotter_steps=bell_basis_trotter_steps[:i+1],
-                bell_basis_circ_depth_per_trotter_step=bell_basis_circ_depth_per_trotter_step,
+                bell_basis_circ_depth_per_trotter_step=bell_basis_circ_depth_per_trotter_step[:i+1],
                 bell_basis_one_qubit_gate_count_per_trotter_step=bell_basis_one_qubit_gate_count_per_trotter_step[:i+1],
                 bell_basis_two_qubit_gate_count_per_trotter_step=bell_basis_two_qubit_gate_count_per_trotter_step[:i+1])
         print(f"Time = {time() - start_time} seconds.", flush=True)
@@ -365,33 +370,34 @@ if __name__ == "__main__":
         h = 1 / N
         start_time = time()
 
-        pauli_op_1d_list = []
+        pauli_op_1d_list_even = []
+        pauli_op_1d_list_odd = []
         for j in range(N):
             op = N * ['I']
             op[j] = 'X'
             op[(j+1)%N] = 'Y'
-            pauli_op_1d_list.append((''.join(op), 1/2))
+            if j % 2 == 0:
+                pauli_op_1d_list_even.append((''.join(op), 1/2))
+            else:
+                pauli_op_1d_list_odd.append(("".join(op), 1/2))
             op = N * ['I']
             op[j] = 'Y'
             op[(j+1)%N] = 'X'
-            pauli_op_1d_list.append((''.join(op), -1/2))
+            if j % 2 == 0:
+                pauli_op_1d_list_even.append((''.join(op), -1/2))
+            else:
+                pauli_op_1d_list_odd.append(("".join(op), -1/2))
 
-        pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
-        pauli_op_1d /= (2 * h)
-        # pauli_op_2d_list = []
-        # for j in range(len(pauli_op_1d_list)):
-        #     op = pauli_op_1d_list[j]
-        #     pauli_op_2d_list.append((op[0] + N * 'I', op[1]))
-        #     pauli_op_2d_list.append((N * 'I' + op[0], op[1]))
-        # # print(pauli_op_2d_list)
-        # pauli_op_2d = SparsePauliOp.from_list(pauli_op_2d_list)
-        # # print(pauli_op_2d)
-
+        pauli_op_1d_even = SparsePauliOp.from_list(pauli_op_1d_list_even)
+        pauli_op_1d_even /= (2 * h)
+        pauli_op_1d_odd = SparsePauliOp.from_list(pauli_op_1d_list_even)
+        pauli_op_1d_odd /= (2 * h)
+        
         # Compute number of gates per Trotter step
         if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d_even + pauli_op_1d_odd))
         elif trotter_method == "second_order":
-            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d_even + pauli_op_1d_odd))
         else:
             raise ValueError(f"{trotter_method} not supported")
 
@@ -405,7 +411,7 @@ if __name__ == "__main__":
             elif op == "rxx":
                 num_two_qubit_gates += ops[op]
         
-        one_hot_circ_depth_per_trotter_step = compiled_circuit.depth()
+        one_hot_circ_depth_per_trotter_step[i] = compiled_circuit.depth()
         # tket_circuit = qiskit_to_tk(compiled_circuit)
         # gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
         # rebase = auto_rebase_pass(gateset) 
@@ -414,7 +420,7 @@ if __name__ == "__main__":
 
         # Gates per Trotter step
         # num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}, depth: {one_hot_circ_depth_per_trotter_step}")
+        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}, depth: {one_hot_circ_depth_per_trotter_step[i]}")
 
         # Computes the Trotter error per dimension, so total error will be error_tol
         one_hot_trotter_steps[i] = get_trotter_number(N, T, error_tol / dimension)
@@ -424,7 +430,7 @@ if __name__ == "__main__":
         np.savez(join(CURR_DIR, f"one_hot_{trotter_method}.npz"),
                  N_vals_one_hot=N_vals_one_hot[:i+1],
                  one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
-                 one_hot_circ_depth_per_trotter_step=one_hot_circ_depth_per_trotter_step,
+                 one_hot_circ_depth_per_trotter_step=one_hot_circ_depth_per_trotter_step[:i+1],
                  one_hot_one_qubit_gate_count_per_trotter_step=one_hot_one_qubit_gate_count_per_trotter_step[:i+1],
                  one_hot_two_qubit_gate_count_per_trotter_step=one_hot_two_qubit_gate_count_per_trotter_step[:i+1])
 
@@ -440,8 +446,11 @@ if __name__ == "__main__":
         h = 1 / N
         start_time = time()
 
-        pauli_op_1d_list = []
         n = N // 2
+        pauli_op_1d_list_even_1 = []
+        pauli_op_1d_list_even_2 = []
+        pauli_op_1d_list_odd_1 = []
+        pauli_op_1d_list_odd_2 = []
         for j in range(N):
 
             if 1 <= j <= N // 2:
@@ -466,26 +475,63 @@ if __name__ == "__main__":
 
             op = n * ['I']
             op[j%n] = 'Y'
-            pauli_op_1d_list.append((''.join(op), (-1) ** c /4))
+            if j % 4 == 0:
+                pauli_op_1d_list_even_1.append((''.join(op), (-1) ** c /4))
+            elif j % 4 == 1:
+                pauli_op_1d_list_odd_1.append((''.join(op), (-1) ** c /4))
+            elif j % 4 == 2:
+                pauli_op_1d_list_even_2.append((''.join(op), (-1) ** c /4))
+            else:
+                pauli_op_1d_list_odd_2.append((''.join(op), (-1) ** c /4))
 
             op = n * ['I']
             op[j%n] = 'Y'
             op[(j-1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), - (-1) ** (a+c) /4))
+            if j % 4 == 0:
+                pauli_op_1d_list_even_1.append((''.join(op), - (-1) ** (a+c) /4))
+            elif j % 4 == 1:
+                pauli_op_1d_list_odd_1.append((''.join(op), - (-1) ** (a+c) /4))
+            elif j % 4 == 2:
+                pauli_op_1d_list_even_2.append((''.join(op), - (-1) ** (a+c) /4))
+            else:
+                pauli_op_1d_list_odd_2.append((''.join(op), - (-1) ** (a+c) /4))
+
 
             op = n * ['I']
             op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), - (-1) ** (b+c) /4))
+            if j % 4 == 0:
+                pauli_op_1d_list_even_1.append((''.join(op), - (-1) ** (b+c) /4))
+            elif j % 4 == 1:
+                pauli_op_1d_list_odd_1.append((''.join(op), - (-1) ** (b+c) /4))
+            elif j % 4 == 2:
+                pauli_op_1d_list_even_2.append((''.join(op), - (-1) ** (b+c) /4))
+            else:
+                pauli_op_1d_list_odd_2.append((''.join(op), - (-1) ** (b+c) /4))
+
 
             op = n * ['I']
             op[(j-1)%n] = 'Z'
             op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
-            pauli_op_1d_list.append((''.join(op), (-1) ** (a+b+c) /4))
+            if j % 4 == 0:
+                pauli_op_1d_list_even_1.append((''.join(op), (-1) ** (a+b+c) /4))
+            elif j % 4 == 1:
+                pauli_op_1d_list_odd_1.append((''.join(op), (-1) ** (a+b+c) /4))
+            elif j % 4 == 2:
+                pauli_op_1d_list_even_2.append((''.join(op), (-1) ** (a+b+c) /4))
+            else:
+                pauli_op_1d_list_odd_2.append((''.join(op), (-1) ** (a+b+c) /4))
 
-        pauli_op_1d = SparsePauliOp.from_list(pauli_op_1d_list)
-        pauli_op_1d /= (2 * h)
+
+        pauli_op_1d_even_1 = SparsePauliOp.from_list(pauli_op_1d_list_even_1)
+        pauli_op_1d_even_2 = SparsePauliOp.from_list(pauli_op_1d_list_even_2)
+        pauli_op_1d_odd_1 = SparsePauliOp.from_list(pauli_op_1d_list_odd_1)
+        pauli_op_1d_odd_2 = SparsePauliOp.from_list(pauli_op_1d_list_odd_2)
+        pauli_op_1d_even_1 /= (2 * h)
+        pauli_op_1d_even_2 /= (2 * h)
+        pauli_op_1d_odd_1 /= (2 * h)
+        pauli_op_1d_odd_2 /= (2 * h)
         # pauli_op_2d_list = []
         # for j in range(len(pauli_op_1d_list)):
         #     op = pauli_op_1d_list[j]
@@ -497,9 +543,9 @@ if __name__ == "__main__":
 
         # Compute number of gates per Trotter step
         if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+            circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_1d_even_1 + pauli_op_1d_even_2 + pauli_op_1d_odd_1 + pauli_op_1d_odd_2))
         elif trotter_method == "second_order":
-            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d.group_commuting()))
+            circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_1d_even_1 + pauli_op_1d_even_2 + pauli_op_1d_odd_1 + pauli_op_1d_odd_2))
         else:
             raise ValueError(f"{trotter_method} not supported")
 
@@ -513,7 +559,7 @@ if __name__ == "__main__":
             elif op == "rxx":
                 num_two_qubit_gates += ops[op]
         
-        unary_circ_depth_per_trotter_step = compiled_circuit.depth()
+        unary_circ_depth_per_trotter_step[i] = compiled_circuit.depth()
         # tket_circuit = qiskit_to_tk(compiled_circuit)
         # gateset = {OpType.Rx, OpType.Ry, OpType.Rz, OpType.XXPhase}
         # rebase = auto_rebase_pass(gateset) 
@@ -522,7 +568,7 @@ if __name__ == "__main__":
 
         # Gates per Trotter step
         # num_single_qubit_gates, num_two_qubit_gates = tket_circuit.n_1qb_gates(), tket_circuit.n_2qb_gates()
-        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}, depth: {unary_circ_depth_per_trotter_step}")
+        print(f"1q gates: {num_single_qubit_gates}, 2q gates: {num_two_qubit_gates}, depth: {unary_circ_depth_per_trotter_step[i]}")
 
         # Computes the Trotter error per dimension, so total error will be error_tol
         unary_trotter_steps[i] = get_trotter_number(N, T, error_tol / dimension)
@@ -532,7 +578,7 @@ if __name__ == "__main__":
         np.savez(join(CURR_DIR, f"unary_{trotter_method}.npz"),
                  N_vals_unary=N_vals_unary[:i+1],
                  unary_trotter_steps=unary_trotter_steps[:i+1],
-                 unary_circ_depth_per_trotter_step=unary_circ_depth_per_trotter_step,
+                 unary_circ_depth_per_trotter_step=unary_circ_depth_per_trotter_step[:i+1],
                  unary_one_qubit_gate_count_per_trotter_step=unary_one_qubit_gate_count_per_trotter_step[:i+1],
                  unary_two_qubit_gate_count_per_trotter_step=unary_two_qubit_gate_count_per_trotter_step[:i+1])
 
