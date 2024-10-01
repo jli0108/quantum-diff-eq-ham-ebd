@@ -232,7 +232,7 @@ def get_bell_basis_trotter_error(n, lamb, T, r, U_A, periodic=True):
 
 if __name__ == "__main__":
 
-    CURR_DIR = join(dirname(__file__), "..", "resource_analysis_data", "2d_advection")
+    CURR_DIR = join(dirname(__file__), "..", "resource_analysis_data", "2d_advection_centered")
     check_and_make_dir(CURR_DIR)
     print("Resource estimation for 2d advection equation.")
 
