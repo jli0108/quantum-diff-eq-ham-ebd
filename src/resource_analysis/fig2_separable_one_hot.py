@@ -54,7 +54,7 @@ if __name__ == "__main__":
         one_hot_trotter_steps[i] = get_trotter_number_one_hot_or_unary(N, N_p, R, T, error_tol / dimension, num_samples, num_jobs)
         print("One-hot Trotter steps:", one_hot_trotter_steps[i], flush=True)
 
-        np.savez(join("../resource_analysis_data", "fig2_separable_one_hot_data.npz"),
+        np.savez(join("../resource_analysis_data", "2d_advection_upwind", "fig2_separable_one_hot_data.npz"),
                 N_vals_one_hot=N_vals_one_hot[:i+1],
                 one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
                 one_hot_single_qubit_gates=one_hot_single_qubit_gates[:i+1],

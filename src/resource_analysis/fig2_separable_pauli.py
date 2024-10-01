@@ -55,7 +55,7 @@ if __name__ == "__main__":
         pauli_basis_trotter_steps[i] = get_trotter_number_pauli_basis(n_vals_binary[i], n_p, R, T, error_tol / dimension, num_samples, num_jobs)
         print("Pauli basis Trotter steps:", pauli_basis_trotter_steps[i], flush=True)
 
-        np.savez(join("../resource_analysis_data", "fig2_separable_pauli_data.npz"),
+        np.savez(join("../resource_analysis_data", "2d_advection_upwind", "fig2_separable_pauli_data.npz"),
                 n_vals_binary=n_vals_binary[:i+1],
                 N_vals_binary=N_vals_binary[:i+1],
                 pauli_basis_trotter_steps=pauli_basis_trotter_steps[:i+1],

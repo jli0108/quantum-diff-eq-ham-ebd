@@ -54,7 +54,7 @@ if __name__ == "__main__":
         print("Bell basis Trotter steps:", bell_basis_trotter_steps[i], flush=True)
                 
 
-    np.savez(join("../resource_analysis_data", "fig2_separable_bell_data.npz"),
+    np.savez(join("../resource_analysis_data", "2d_advection_upwind", "fig2_separable_bell_data.npz"),
             n_vals_bell_basis=n_vals_bell_basis[:i+1],
             N_vals_bell_basis=N_vals_bell_basis[:i+1],
             bell_basis_trotter_steps=bell_basis_trotter_steps[:i+1],
