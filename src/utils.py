@@ -33,8 +33,8 @@ def sum_x(n : int) -> np.ndarray:
 
 def sum_y(n : int) -> np.ndarray:
     '''
-    Returns `\sum_i \sigma_x^{(i)}` where `\sigma_x^{(i)}` 
-    is the Pauli-x operator on the ith qubit.
+    Returns `\sum_i \sigma_y^{(i)}` where `\sigma_y^{(i)}` 
+    is the Pauli-y operator on the ith qubit.
     '''
     assert n > 0
     dims = [2 ** i for i in range(n)]
@@ -43,6 +43,21 @@ def sum_y(n : int) -> np.ndarray:
     res = csc_matrix((2 ** n, 2 ** n))
     for i in range(n):
         res += tensor([identity(dims[n-i-1], format='csr'), PAULI_Y, identity(dims[i], format='csr')])
+        
+    return res
+
+def sum_z(n : int) -> np.ndarray:
+    '''
+    Returns `\sum_i \sigma_z^{(i)}` where `\sigma_z^{(i)}` 
+    is the Pauli-z operator on the ith qubit.
+    '''
+    assert n > 0
+    dims = [2 ** i for i in range(n)]
+#     return np.sum([tensor([identity(dims[i], format='csr'), PAULI_Y, identity(dims[n-i-1], format='csr')]) for i in range(n)])
+    
+    res = csc_matrix((2 ** n, 2 ** n))
+    for i in range(n):
+        res += tensor([identity(dims[n-i-1], format='csr'), PAULI_Z, identity(dims[i], format='csr')])
         
     return res
 
