@@ -359,46 +359,55 @@ if __name__ == "__main__":
 
     print("Running resource analysis for nonlinear PDE", flush=True)
     start_time = time()
-    error_tols = np.exp(-np.linspace(np.log(10), np.log(1000), 10))
-    N = 64                                     # grid points along each dimension
-    n_x = int(np.log2(N))
+    error_tol = 5e-2
+    n_vals = np.arange(2, 7)
+    N_vals = 2 ** n_vals                        # grid points along each dimension
     n_p = 5                                     # num qubits for p
     N_p = 2 ** n_p
     T = 1
     R = 8
     trotter_method="first_order"
 
-    print("Error tolerances:", error_tols, flush=True)
+    print("Error tolerance:", error_tol, flush=True)
 
-    pauli_basis_trotter_steps = np.zeros((len(error_tols)))
-    one_hot_trotter_steps = np.zeros((len(error_tols)))
+    pauli_basis_trotter_steps = np.zeros_like(N_vals)
+    pauli_basis_single_qubit_gates = np.zeros_like(N_vals)
+    pauli_basis_two_qubit_gates = np.zeros_like(N_vals)
+    pauli_basis_circ_depth = np.zeros_like(N_vals)
 
-    # Gate counts per Trotter step
-    H_std_binary, H_std_binary_sp_mats = get_H_std_binary(N, n_p, R)
-    print("Computing Trotter steps for Pauli basis.", flush=True)
-    pauli_basis_trotter_steps = get_first_order_trotter_steps(T, H_std_binary_sp_mats, error_tols)
-    print("Computing gates per Trotter step for Pauli basis.", flush=True)
-    pauli_basis_single_qubit_gates, pauli_basis_two_qubit_gates = get_gate_count_per_trotter_step(H_std_binary, trotter_method)
-    pauli_basis_circ_depth = get_circuit_depth(2 * n_x + n_p, H_std_binary)
-    
-    '''One-hot encoding (ours)'''
-    H_one_hot, H_one_hot_sp_mats = get_H_one_hot(N, n_p, R)
-    print("Computing Trotter steps for one-hot encoding.", flush=True)
-    one_hot_trotter_steps = get_first_order_trotter_steps(T, H_one_hot_sp_mats, error_tols)
-    print("Computing gates per Trotter step for one-hot.", flush=True)
-    one_hot_single_qubit_gates, one_hot_two_qubit_gates = get_gate_count_per_trotter_step(H_one_hot, trotter_method)
-    one_hot_circ_depth = get_circuit_depth(2 * N + n_p, H_one_hot)
+    one_hot_trotter_steps = np.zeros_like(N_vals)
+    one_hot_single_qubit_gates = np.zeros_like(N_vals)
+    one_hot_two_qubit_gates = np.zeros_like(N_vals)
+    one_hot_circ_depth = np.zeros_like(N_vals)
 
-    np.savez(join("../resource_analysis_data", f"nonlinear_data_{trotter_method}.npz"),
-            error_tols=error_tols,
-            pauli_basis_trotter_steps=pauli_basis_trotter_steps,
-            pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates,
-            pauli_basis_two_qubit_gates=pauli_basis_two_qubit_gates,
-            pauli_basis_circ_depth=pauli_basis_circ_depth,
-            one_hot_trotter_steps=one_hot_trotter_steps,
-            one_hot_single_qubit_gates=one_hot_single_qubit_gates,
-            one_hot_two_qubit_gates=one_hot_two_qubit_gates,
-            one_hot_circ_depth=one_hot_circ_depth)
+    for i, N in enumerate(N_vals):
+        n_x = n_vals[i]
+        # Gate counts per Trotter step
+        H_std_binary, H_std_binary_sp_mats = get_H_std_binary(N, n_p, R)
+        print("Computing Trotter steps for Pauli basis.", flush=True)
+        pauli_basis_trotter_steps[i] = get_first_order_trotter_steps(T, H_std_binary_sp_mats, error_tol)
+        print("Computing gates per Trotter step for Pauli basis.", flush=True)
+        pauli_basis_single_qubit_gates[i], pauli_basis_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_std_binary, trotter_method)
+        pauli_basis_circ_depth[i] = get_circuit_depth(2 * n_x + n_p, H_std_binary)
+        
+        '''One-hot encoding (ours)'''
+        H_one_hot, H_one_hot_sp_mats = get_H_one_hot(N, n_p, R)
+        print("Computing Trotter steps for one-hot encoding.", flush=True)
+        one_hot_trotter_steps[i] = get_first_order_trotter_steps(T, H_one_hot_sp_mats, error_tol)
+        print("Computing gates per Trotter step for one-hot.", flush=True)
+        one_hot_single_qubit_gates[i], one_hot_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_one_hot, trotter_method)
+        one_hot_circ_depth[i] = get_circuit_depth(2 * N + n_p, H_one_hot)
+
+        np.savez(join("../resource_analysis_data", f"nonlinear_data_{trotter_method}.npz"),
+                N_vals=N_vals,
+                pauli_basis_trotter_steps=pauli_basis_trotter_steps[:i+1],
+                pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates[:i+1],
+                pauli_basis_two_qubit_gates=pauli_basis_two_qubit_gates[:i+1],
+                pauli_basis_circ_depth=pauli_basis_circ_depth[:i+1],
+                one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
+                one_hot_single_qubit_gates=one_hot_single_qubit_gates[:i+1],
+                one_hot_two_qubit_gates=one_hot_two_qubit_gates[:i+1],
+                one_hot_circ_depth=one_hot_circ_depth[:i+1])
 
     end_time = time()
     print(f"Runtime: {end_time - start_time}", flush=True)
