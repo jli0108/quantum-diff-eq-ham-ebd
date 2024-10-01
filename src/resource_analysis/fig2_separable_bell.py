@@ -55,8 +55,8 @@ if __name__ == "__main__":
                 
 
     np.savez(join("../resource_analysis_data", "fig2_separable_bell_data.npz"),
-            n_vals_bell_basis=n_vals_bell_basis,
-            N_vals_bell_basis=N_vals_bell_basis,
+            n_vals_bell_basis=n_vals_bell_basis[:i+1],
+            N_vals_bell_basis=N_vals_bell_basis[:i+1],
             bell_basis_trotter_steps=bell_basis_trotter_steps[:i+1],
             bell_basis_single_qubit_gates=bell_basis_single_qubit_gates[:i+1],
             bell_basis_two_qubit_gates=bell_basis_two_qubit_gates[:i+1],

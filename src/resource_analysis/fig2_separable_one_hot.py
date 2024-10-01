@@ -55,8 +55,7 @@ if __name__ == "__main__":
         print("One-hot Trotter steps:", one_hot_trotter_steps[i], flush=True)
 
         np.savez(join("../resource_analysis_data", "fig2_separable_one_hot_data.npz"),
-                dimension=dimension,
-                error_tol=error_tol,
+                N_vals_one_hot=N_vals_one_hot[:i+1],
                 one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
                 one_hot_single_qubit_gates=one_hot_single_qubit_gates[:i+1],
                 one_hot_two_qubit_gates=one_hot_two_qubit_gates[:i+1],

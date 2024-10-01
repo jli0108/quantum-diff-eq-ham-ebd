@@ -54,8 +54,7 @@ if __name__ == "__main__":
         print("Unary Trotter steps:", unary_trotter_steps[i], flush=True)
 
         np.savez(join("../resource_analysis_data", "fig2_separable_unary_data.npz"),
-                dimension=dimension,
-                error_tol=error_tol,
+                N_vals_unary=N_vals_unary[:i+1],
                 unary_trotter_steps=unary_trotter_steps[:i+1],
                 unary_single_qubit_gates=unary_single_qubit_gates[:i+1],
                 unary_two_qubit_gates=unary_two_qubit_gates[:i+1],
