@@ -22,11 +22,11 @@ from os.path import join
 import sys
 sys.path.append(join(".", ".."))
 from utils import *
-from fig2_separable_utils import *
+from resource_analysis_2d_adv_upwind_utils import *
 
 if __name__ == "__main__":
 
-    print("Running Fig 2 script", flush=True)
+    print("Running resource analysis for 2d advection (upwind)", flush=True)
     start_time = time()
     dimension = 2
     error_tol = 5e-2
@@ -54,7 +54,7 @@ if __name__ == "__main__":
         one_hot_trotter_steps[i] = get_trotter_number_one_hot_or_unary(N, N_p, R, T, error_tol / dimension, num_samples, num_jobs)
         print("One-hot Trotter steps:", one_hot_trotter_steps[i], flush=True)
 
-        np.savez(join("../resource_analysis_data", "2d_advection_upwind", "fig2_separable_one_hot_data.npz"),
+        np.savez(join("../resource_analysis_data", "2d_advection_upwind", "separable_one_hot_data.npz"),
                 N_vals_one_hot=N_vals_one_hot[:i+1],
                 one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
                 one_hot_single_qubit_gates=one_hot_single_qubit_gates[:i+1],

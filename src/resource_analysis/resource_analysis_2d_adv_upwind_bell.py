@@ -22,11 +22,11 @@ from os.path import join
 import sys
 sys.path.append(join(".", ".."))
 from utils import *
-from fig2_separable_utils import *
+from resource_analysis_2d_adv_upwind_utils import *
 
 if __name__ == "__main__":
 
-    print("Running Fig 2 script", flush=True)
+    print("Running resource analysis for 2d advection (upwind)", flush=True)
     start_time = time()
     dimension = 2
     error_tol = 5e-2
@@ -54,7 +54,7 @@ if __name__ == "__main__":
         print("Bell basis Trotter steps:", bell_basis_trotter_steps[i], flush=True)
                 
 
-    np.savez(join("../resource_analysis_data", "2d_advection_upwind", "fig2_separable_bell_data.npz"),
+    np.savez(join("../resource_analysis_data", "2d_advection_upwind", "separable_bell_data.npz"),
             n_vals_bell_basis=n_vals_bell_basis[:i+1],
             N_vals_bell_basis=N_vals_bell_basis[:i+1],
             bell_basis_trotter_steps=bell_basis_trotter_steps[:i+1],
