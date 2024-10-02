@@ -337,21 +337,21 @@ def get_H_unary(N, n_p, R):
 
         # Diagonal part
         op = n * ['I']
-        F_x_1_pauli_list.append((N * 'I', F_x_1[j,j].real))
-        F_p_1_pauli_list.append((N * 'I', F_p_1[j,j].real))
+        F_x_1_pauli_list.append((''.join(op), F_x_1[j,j].real))
+        F_p_1_pauli_list.append((''.join(op), F_p_1[j,j].real))
         op = n * ['I']
         op[(j-1)%n] = 'Z'
-        F_x_1_pauli_list.append((N * 'I', (-1) ** (b) * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((N * 'I', (-1) ** (b) * F_p_1[j,j].real))
+        F_x_1_pauli_list.append((''.join(op), (-1) ** (b) * F_x_1[j,j].real))
+        F_p_1_pauli_list.append((''.join(op), (-1) ** (b) * F_p_1[j,j].real))
         op = n * ['I']
         op[j%n] = 'Z'
-        F_x_1_pauli_list.append((N * 'I', (-1) ** (c) * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((N * 'I', (-1) ** (c) * F_p_1[j,j].real))
+        F_x_1_pauli_list.append((''.join(op), (-1) ** (c) * F_x_1[j,j].real))
+        F_p_1_pauli_list.append((''.join(op), (-1) ** (c) * F_p_1[j,j].real))
         op = n * ['I']
         op[j%n] = 'Z'
         op[(j-1)%n] = 'Z'
-        F_x_1_pauli_list.append((N * 'I', (-1) ** (c + b) * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((N * 'I', (-1) ** (c + b) * F_p_1[j,j].real))
+        F_x_1_pauli_list.append((''.join(op), (-1) ** (c + b) * F_x_1[j,j].real))
+        F_p_1_pauli_list.append((''.join(op), (-1) ** (c + b) * F_p_1[j,j].real))
 
     for j in range(N):
         if n - 1 <= j < N - 1:
@@ -396,41 +396,41 @@ def get_H_unary(N, n_p, R):
 
         # Diagonal part
         op = n * ['I']
-        F_x_2_pauli_list.append((N * 'I', F_x_2[j,j].real))
-        F_p_2_pauli_list.append((N * 'I', F_p_2[j,j].real))
+        F_x_2_pauli_list.append((''.join(op), F_x_2[j,j].real))
+        F_p_2_pauli_list.append((''.join(op), F_p_2[j,j].real))
         op = n * ['I']
         op[(j-1)%n] = 'Z'
-        F_x_2_pauli_list.append((N * 'I', (-1) ** (b) * F_x_2[j,j].real))
-        F_p_2_pauli_list.append((N * 'I', (-1) ** (b) * F_p_2[j,j].real))
+        F_x_2_pauli_list.append((''.join(op), (-1) ** (b) * F_x_2[j,j].real))
+        F_p_2_pauli_list.append((''.join(op), (-1) ** (b) * F_p_2[j,j].real))
         op = n * ['I']
         op[j%n] = 'Z'
-        F_x_2_pauli_list.append((N * 'I', (-1) ** (c) * F_x_2[j,j].real))
-        F_p_2_pauli_list.append((N * 'I', (-1) ** (c) * F_p_2[j,j].real))
+        F_x_2_pauli_list.append((''.join(op), (-1) ** (c) * F_x_2[j,j].real))
+        F_p_2_pauli_list.append((''.join(op), (-1) ** (c) * F_p_2[j,j].real))
         op = n * ['I']
         op[j%n] = 'Z'
         op[(j-1)%n] = 'Z'
-        F_x_2_pauli_list.append((N * 'I', (-1) ** (c + b) * F_x_2[j,j].real))
-        F_p_2_pauli_list.append((N * 'I', (-1) ** (c + b) * F_p_2[j,j].real))
+        F_x_2_pauli_list.append((''.join(op), (-1) ** (c + b) * F_x_2[j,j].real))
+        F_p_2_pauli_list.append((''.join(op), (-1) ** (c + b) * F_p_2[j,j].real))
 
 
     for j in range(N):
         # Diagonal part
         op = n * ['I']
-        D_x_pauli_list.append((N * 'I', D_x[j,j].real))
-        D_p_pauli_list.append((N * 'I', D_p[j,j].real))
+        D_x_pauli_list.append((''.join(op), D_x[j,j].real))
+        D_p_pauli_list.append((''.join(op), D_p[j,j].real))
         op = n * ['I']
         op[(j-1)%n] = 'Z'
-        D_x_pauli_list.append((N * 'I', (-1) ** (b) * D_x[j,j].real))
-        D_p_pauli_list.append((N * 'I', (-1) ** (b) * D_p[j,j].real))
+        D_x_pauli_list.append((''.join(op), (-1) ** (b) * D_x[j,j].real))
+        D_p_pauli_list.append((''.join(op), (-1) ** (b) * D_p[j,j].real))
         op = n * ['I']
         op[j%n] = 'Z'
-        D_x_pauli_list.append((N * 'I', (-1) ** (c) * D_x[j,j].real))
-        D_p_pauli_list.append((N * 'I', (-1) ** (c) * D_p[j,j].real))
+        D_x_pauli_list.append((''.join(op), (-1) ** (c) * D_x[j,j].real))
+        D_p_pauli_list.append((''.join(op), (-1) ** (c) * D_p[j,j].real))
         op = n * ['I']
         op[j%n] = 'Z'
         op[(j-1)%n] = 'Z'
-        D_x_pauli_list.append((N * 'I', (-1) ** (c + b) * D_x[j,j].real))
-        D_p_pauli_list.append((N * 'I', (-1) ** (c + b) * D_p[j,j].real))
+        D_x_pauli_list.append((''.join(op), (-1) ** (c + b) * D_x[j,j].real))
+        D_p_pauli_list.append((''.join(op), (-1) ** (c + b) * D_p[j,j].real))
 
 
     F_x_1_pauli_op_grouped = SparsePauliOp.from_list(F_x_1_pauli_list).simplify().group_commuting()
@@ -600,7 +600,7 @@ if __name__ == "__main__":
         unary_trotter_steps[i] = get_first_order_trotter_steps(T, H_unary_sp_mats, error_tol)
         print("Computing gates per Trotter step for unary.", flush=True)
         unary_single_qubit_gates[i], unary_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_unary, trotter_method)
-        unary_circ_depth[i] = get_circuit_depth(2 * N + n_p, H_unary)
+        unary_circ_depth[i] = get_circuit_depth(2 * (N // 2) + n_p, H_unary)
 
         np.savez(join("../resource_analysis_data", f"nonlinear_data_{trotter_method}_unary.npz"),
                 N_vals=N_vals,
