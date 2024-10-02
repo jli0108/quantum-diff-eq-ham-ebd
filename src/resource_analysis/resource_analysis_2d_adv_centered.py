@@ -452,20 +452,14 @@ if __name__ == "__main__":
         pauli_op_1d_list_odd_1 = []
         pauli_op_1d_list_odd_2 = []
         for j in range(N):
-
-            if 1 <= j <= N // 2:
-                # print(f"n_{j-1}^(1)")
+            if n - 1 <= j < N - 1:
                 a = 1
             else:
-                # print(f"n_{j-1}^(0)")
                 a = 0
 
-            # print(f"X_{j}")
-            if n - 1 <= j < N - 1:
-                # print(f"n_{j+1}^(1)")
+            if 1 <= j <= N // 2:
                 b = 1
             else:
-                # print(f"n_{j+1}^(0)")
                 b = 0
                     
             if j >= n:
@@ -486,34 +480,32 @@ if __name__ == "__main__":
 
             op = n * ['I']
             op[j%n] = 'Y'
-            op[(j-1)%n] = 'Z'
+            op[(j+1)%n] = 'Z'
             if j % 4 == 0:
-                pauli_op_1d_list_even_1.append((''.join(op), - (-1) ** (a+c) /4))
+                pauli_op_1d_list_even_1.append((''.join(op), (-1) ** (a+c) /4))
             elif j % 4 == 1:
-                pauli_op_1d_list_odd_1.append((''.join(op), - (-1) ** (a+c) /4))
+                pauli_op_1d_list_odd_1.append((''.join(op), (-1) ** (a+c) /4))
             elif j % 4 == 2:
-                pauli_op_1d_list_even_2.append((''.join(op), - (-1) ** (a+c) /4))
+                pauli_op_1d_list_even_2.append((''.join(op), (-1) ** (a+c) /4))
             else:
-                pauli_op_1d_list_odd_2.append((''.join(op), - (-1) ** (a+c) /4))
-
+                pauli_op_1d_list_odd_2.append((''.join(op), (-1) ** (a+c) /4))
 
             op = n * ['I']
             op[j%n] = 'Y'
-            op[(j+1)%n] = 'Z'
+            op[(j-1)%n] = 'Z'
             if j % 4 == 0:
-                pauli_op_1d_list_even_1.append((''.join(op), - (-1) ** (b+c) /4))
+                pauli_op_1d_list_even_1.append((''.join(op), (-1) ** (b+c) /4))
             elif j % 4 == 1:
-                pauli_op_1d_list_odd_1.append((''.join(op), - (-1) ** (b+c) /4))
+                pauli_op_1d_list_odd_1.append((''.join(op), (-1) ** (b+c) /4))
             elif j % 4 == 2:
-                pauli_op_1d_list_even_2.append((''.join(op), - (-1) ** (b+c) /4))
+                pauli_op_1d_list_even_2.append((''.join(op), (-1) ** (b+c) /4))
             else:
-                pauli_op_1d_list_odd_2.append((''.join(op), - (-1) ** (b+c) /4))
-
+                pauli_op_1d_list_odd_2.append((''.join(op), (-1) ** (b+c) /4))
 
             op = n * ['I']
-            op[(j-1)%n] = 'Z'
-            op[j%n] = 'Y'
             op[(j+1)%n] = 'Z'
+            op[j%n] = 'Y'
+            op[(j-1)%n] = 'Z'
             if j % 4 == 0:
                 pauli_op_1d_list_even_1.append((''.join(op), (-1) ** (a+b+c) /4))
             elif j % 4 == 1:

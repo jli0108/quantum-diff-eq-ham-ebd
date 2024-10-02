@@ -188,19 +188,14 @@ def unary_gate_count_per_trotter_step(N, n_p, R, trotter_method="second_order"):
     op = n * ['I']
     H_1_pauli_list.append((''.join(op), 1))
     for j in range(N):
-        if 1 <= j <= N // 2:
-            # print(f"n_{j-1}^(1)")
+        if n - 1 <= j < N - 1:
             a = 1
         else:
-            # print(f"n_{j-1}^(0)")
             a = 0
 
-        # print(f"X_{j}")
-        if n - 1 <= j < N - 1:
-            # print(f"n_{j+1}^(1)")
+        if 1 <= j <= N // 2:
             b = 1
         else:
-            # print(f"n_{j+1}^(0)")
             b = 0
                 
         if j >= n:
@@ -211,23 +206,23 @@ def unary_gate_count_per_trotter_step(N, n_p, R, trotter_method="second_order"):
         # Hermitian part
         op = n * ['I']
         op[j%n] = 'X'
-        H_1_pauli_list.append((''.join(op), (-1) ** c /4))
-
-        op = n * ['I']
-        op[j%n] = 'X'
-        op[(j-1)%n] = 'Z'
-        H_1_pauli_list.append((''.join(op), - (-1) ** (a+c) /4))
+        H_1_pauli_list.append((''.join(op), (-1) ** 0 /4))
 
         op = n * ['I']
         op[j%n] = 'X'
         op[(j+1)%n] = 'Z'
-        H_1_pauli_list.append((''.join(op), - (-1) ** (b+c) /4))
+        H_1_pauli_list.append((''.join(op), (-1) ** (a+0) /4))
+
+        op = n * ['I']
+        op[j%n] = 'X'
+        op[(j-1)%n] = 'Z'
+        H_1_pauli_list.append((''.join(op), (-1) ** (b+0) /4))
 
         op = n * ['I']
         op[(j-1)%n] = 'Z'
         op[j%n] = 'X'
         op[(j+1)%n] = 'Z'
-        H_1_pauli_list.append((''.join(op), (-1) ** (a+b+c) /4))
+        H_1_pauli_list.append((''.join(op), (-1) ** (a+b+0) /4))
     
         # Anti-Hermitian part
         op = n * ['I']
@@ -236,18 +231,18 @@ def unary_gate_count_per_trotter_step(N, n_p, R, trotter_method="second_order"):
 
         op = n * ['I']
         op[j%n] = 'Y'
-        op[(j-1)%n] = 'Z'
-        H_2_pauli_list.append((''.join(op), - (-1) ** (a+c) /4))
+        op[(j+1)%n] = 'Z'
+        H_2_pauli_list.append((''.join(op), (-1) ** (a+c) /4))
 
         op = n * ['I']
         op[j%n] = 'Y'
-        op[(j+1)%n] = 'Z'
-        H_2_pauli_list.append((''.join(op), - (-1) ** (b+c) /4))
+        op[(j-1)%n] = 'Z'
+        H_2_pauli_list.append((''.join(op), (-1) ** (b+c) /4))
 
         op = n * ['I']
-        op[(j-1)%n] = 'Z'
-        op[j%n] = 'Y'
         op[(j+1)%n] = 'Z'
+        op[j%n] = 'Y'
+        op[(j-1)%n] = 'Z'
         H_2_pauli_list.append((''.join(op), (-1) ** (a+b+c) /4))
 
     xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
