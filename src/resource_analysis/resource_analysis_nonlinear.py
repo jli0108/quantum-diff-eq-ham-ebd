@@ -104,40 +104,11 @@ def get_H_std_binary(N, n_p, R):
 
     return H, H_sp_mats
 
-def one_hot_projection(H_term):
-    N = H_term.num_qubits
-    pauli_str = H_term.to_list()[0][0]
-    pauli_indices = []
-    for j in range(N):
-        if pauli_str[j] != 'I':
-            pauli_indices.append(j)
-    if len(pauli_indices) == 0:
-        mat = np.identity(N, dtype=np.complex128)
-    elif len(pauli_indices) == 1:
-        mat = np.identity(N, dtype=np.complex128)
-        assert pauli_str[pauli_indices[0]] == 'Z'
-        mat[pauli_indices[0], pauli_indices[0]] = -1
-    elif len(pauli_indices) == 2:
-        mat = np.zeros((N,N), dtype=np.complex128)
-        if pauli_str[pauli_indices[0]] + pauli_str[pauli_indices[1]] == 'XX' or pauli_str[pauli_indices[0]] + pauli_str[pauli_indices[1]] == 'YY':
-            mat[pauli_indices[0], pauli_indices[1]] = 1
-            mat[pauli_indices[1], pauli_indices[0]] = 1
-        elif pauli_str[pauli_indices[0]] + pauli_str[pauli_indices[1]] == 'XY':
-            mat[pauli_indices[0], pauli_indices[1]] *= -1j
-            mat[pauli_indices[1], pauli_indices[0]] *= 1j
-        elif pauli_str[pauli_indices[0]] + pauli_str[pauli_indices[1]] == 'YX':
-            mat[pauli_indices[0], pauli_indices[1]] *= -1j
-            mat[pauli_indices[1], pauli_indices[0]] *= 1j
-        else:
-            raise Exception()
-    else:
-        raise Exception()
-    return H_term.coeffs[0] * csc_matrix(mat)
-
 def get_H_one_hot(N, n_p, R):
 
     h = 1 / N
     N_p = 2 ** n_p
+    codewords = get_codewords(N, dimension=1, encoding="one-hot")
 
     F_x = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
@@ -213,12 +184,12 @@ def get_H_one_hot(N, n_p, R):
         F_x_2_pauli_list.append((''.join(op), -0.5*F_x_2[(j+1)%N,j].imag))
         F_p_2_pauli_list.append((''.join(op), -0.5*F_p_2[(j+1)%N,j].imag))
 
-        F_x_2_pauli_list.append((N * 'I', 0.5 * F_x_1[j,j].real))
-        F_p_2_pauli_list.append((N * 'I', 0.5 * F_p_1[j,j].real))
+        F_x_2_pauli_list.append((N * 'I', 0.5 * F_x_2[j,j].real))
+        F_p_2_pauli_list.append((N * 'I', 0.5 * F_p_2[j,j].real))
         op = N * ['I']
         op[j] = 'Z'
-        F_x_2_pauli_list.append((''.join(op), -0.5 * F_x_1[j,j].real))
-        F_p_2_pauli_list.append((''.join(op), -0.5 * F_p_1[j,j].real))
+        F_x_2_pauli_list.append((''.join(op), -0.5 * F_x_2[j,j].real))
+        F_p_2_pauli_list.append((''.join(op), -0.5 * F_p_2[j,j].real))
 
     for j in range(N):
         D_x_pauli_list.append((N * 'I', 0.5 * D_x[j,j].real))
@@ -242,28 +213,16 @@ def get_H_one_hot(N, n_p, R):
 
     F_x_1_sp_mats = []
     for j in range(len(F_x_1_pauli_op_grouped)):
-        sp_mat = csc_matrix((N,N), dtype=np.complex128)
-        for k in range(len(F_x_1_pauli_op_grouped[j])):
-            sp_mat += one_hot_projection(F_x_1_pauli_op_grouped[j][k])
-        F_x_1_sp_mats.append(sp_mat)
+        F_x_1_sp_mats.append(F_x_1_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
     F_p_1_sp_mats = []
     for j in range(len(F_p_1_pauli_op_grouped)):
-        sp_mat = csc_matrix((N,N), dtype=np.complex128)
-        for k in range(len(F_p_1_pauli_op_grouped[j])):
-            sp_mat += one_hot_projection(F_p_1_pauli_op_grouped[j][k])
-        F_p_1_sp_mats.append(sp_mat)
+        F_p_1_sp_mats.append(F_p_1_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
     F_x_2_sp_mats = []
     for j in range(len(F_x_2_pauli_op_grouped)):
-        sp_mat = csc_matrix((N,N), dtype=np.complex128)
-        for k in range(len(F_x_2_pauli_op_grouped[j])):
-            sp_mat += one_hot_projection(F_x_2_pauli_op_grouped[j][k])
-        F_x_2_sp_mats.append(sp_mat)
+        F_x_2_sp_mats.append(F_x_2_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
     F_p_2_sp_mats = []
     for j in range(len(F_p_2_pauli_op_grouped)):
-        sp_mat = csc_matrix((N,N), dtype=np.complex128)
-        for k in range(len(F_p_2_pauli_op_grouped[j])):
-            sp_mat += one_hot_projection(F_p_2_pauli_op_grouped[j][k])
-        F_p_2_sp_mats.append(sp_mat)
+        F_p_2_sp_mats.append(F_p_2_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
 
     H = []
     H_sp_mats = []
@@ -286,6 +245,238 @@ def get_H_one_hot(N, n_p, R):
         H_sp_mats.append(-tensor([D_x, F_p_2_sp_mats[j], identity(N_p)]))
 
     return H, H_sp_mats
+
+def get_H_unary(N, n_p, R):
+    n = N // 2
+    h = 1 / N
+    N_p = 2 ** n_p
+    codewords = get_codewords(N, dimension=1, encoding="unary", periodic=True)
+
+    F_x = lil_matrix((N, N), dtype=np.complex128)
+    for j in range(N):
+        F_x[j,(j+1)%N] = 1
+        F_x[j,j] = -1
+    F_x /= h
+
+    F_p = lil_matrix((N, N), dtype=np.complex128)
+    p_vals = np.linspace(-1, 1, N, endpoint=False)
+    for j in range(N):
+        p = p_vals[j]
+        F_p[j,(j+1)%N] = (p**3*(1-p**2)+1)
+        F_p[j,j] = - (p**3*(1-p**2)+1)
+    F_p /= h
+
+    D_x = lil_matrix((N, N), dtype=np.complex128)
+    x_vals = np.linspace(-1, 1, N, endpoint=False)
+    for j in range(N):
+        x = x_vals[j]
+        D_x[j,j] = x**3 * (1-x**2) + 1
+
+    D_p = lil_matrix((N, N), dtype=np.complex128)
+    p_vals = np.linspace(-1, 1, N, endpoint=False)
+    for j in range(N):
+        p = p_vals[j]
+        D_p[j,j] = p ** 3 * (1 - p ** 4)
+
+
+    F_x_1 = (F_x + np.conj(F_x.T)) / 2
+    F_x_2 = (F_x - np.conj(F_x.T)) / 2j
+    F_p_1 = (F_p + np.conj(F_p.T)) / 2
+    F_p_2 = (F_p - np.conj(F_p.T)) / 2j
+
+
+
+    F_x_1_pauli_list = []
+    F_x_2_pauli_list = []
+    F_p_1_pauli_list = []
+    F_p_2_pauli_list = []
+    D_x_pauli_list = []
+    D_p_pauli_list = []
+
+    for j in range(N):
+        if n - 1 <= j < N - 1:
+            a = 1
+        else:
+            a = 0
+
+        if 1 <= j <= N // 2:
+            b = 1
+        else:
+            b = 0
+                
+        if j >= n:
+            c = 1
+        else:
+            c = 0
+
+        # Real part
+        op = n * ['I']
+        op[j%n] = 'X'
+        F_x_1_pauli_list.append((''.join(op), ((-1) ** 0 / 4) * F_x_1[(j+1)%N,j].real))
+        F_p_1_pauli_list.append((''.join(op), ((-1) ** 0 / 4) * F_p_1[(j+1)%N,j].real))
+
+        op = n * ['I']
+        op[j%n] = 'X'
+        op[(j-1)%n] = 'Z'
+        F_x_1_pauli_list.append((''.join(op), ((-1) ** (a+0) / 4) * F_x_1[(j+1)%N,j].real))
+        F_p_1_pauli_list.append((''.join(op), ((-1) ** (a+0) / 4) * F_p_1[(j+1)%N,j].real))
+        
+        op = n * ['I']
+        op[j%n] = 'X'
+        op[(j+1)%n] = 'Z'
+        F_x_1_pauli_list.append((''.join(op), ((-1) ** (b+0) / 4) * F_x_1[(j+1)%N,j].real))
+        F_p_1_pauli_list.append((''.join(op), ((-1) ** (b+0) / 4) * F_p_1[(j+1)%N,j].real))
+
+        op = n * ['I']
+        op[(j-1)%n] = 'Z'
+        op[j%n] = 'X'
+        op[(j+1)%n] = 'Z'
+        F_x_1_pauli_list.append((''.join(op), ((-1) ** (a+b+0) / 4) * F_x_1[(j+1)%N,j].real))
+        F_p_1_pauli_list.append((''.join(op), ((-1) ** (a+b+0) / 4) * F_p_1[(j+1)%N,j].real))
+        
+
+        # Diagonal part
+        op = n * ['I']
+        F_x_1_pauli_list.append((N * 'I', F_x_1[j,j].real))
+        F_p_1_pauli_list.append((N * 'I', F_p_1[j,j].real))
+        op = n * ['I']
+        op[(j-1)%n] = 'Z'
+        F_x_1_pauli_list.append((N * 'I', (-1) ** (b) * F_x_1[j,j].real))
+        F_p_1_pauli_list.append((N * 'I', (-1) ** (b) * F_p_1[j,j].real))
+        op = n * ['I']
+        op[j%n] = 'Z'
+        F_x_1_pauli_list.append((N * 'I', (-1) ** (c) * F_x_1[j,j].real))
+        F_p_1_pauli_list.append((N * 'I', (-1) ** (c) * F_p_1[j,j].real))
+        op = n * ['I']
+        op[j%n] = 'Z'
+        op[(j-1)%n] = 'Z'
+        F_x_1_pauli_list.append((N * 'I', (-1) ** (c + b) * F_x_1[j,j].real))
+        F_p_1_pauli_list.append((N * 'I', (-1) ** (c + b) * F_p_1[j,j].real))
+
+    for j in range(N):
+        if n - 1 <= j < N - 1:
+            a = 1
+        else:
+            a = 0
+
+        if 1 <= j <= N // 2:
+            b = 1
+        else:
+            b = 0
+                
+        if j >= n:
+            c = 1
+        else:
+            c = 0
+
+        # Imag part
+        op = n * ['I']
+        op[j%n] = 'Y'
+        F_x_2_pauli_list.append((''.join(op), ((-1) ** c / 4) * F_x_2[(j+1)%N,j].imag))
+        F_p_2_pauli_list.append((''.join(op), ((-1) ** c / 4) * F_p_2[(j+1)%N,j].imag))
+
+        op = n * ['I']
+        op[j%n] = 'Y'
+        op[(j-1)%n] = 'Z'
+        F_x_2_pauli_list.append((''.join(op), (- (-1) ** (a+c) / 4) * F_x_2[(j+1)%N,j].imag))
+        F_p_2_pauli_list.append((''.join(op), (- (-1) ** (a+c) / 4) * F_p_2[(j+1)%N,j].imag))
+        
+        op = n * ['I']
+        op[j%n] = 'Y'
+        op[(j+1)%n] = 'Z'
+        F_x_2_pauli_list.append((''.join(op), (- (-1) ** (b+c) / 4) * F_x_2[(j+1)%N,j].imag))
+        F_p_2_pauli_list.append((''.join(op), (- (-1) ** (b+c) / 4) * F_p_2[(j+1)%N,j].imag))
+
+        op = n * ['I']
+        op[(j-1)%n] = 'Z'
+        op[j%n] = 'Y'
+        op[(j+1)%n] = 'Z'
+        F_x_2_pauli_list.append((''.join(op), ((-1) ** (a+b+c) / 4) * F_x_2[(j+1)%N,j].imag))
+        F_p_2_pauli_list.append((''.join(op), ((-1) ** (a+b+c) / 4) * F_p_2[(j+1)%N,j].imag))
+
+        # Diagonal part
+        op = n * ['I']
+        F_x_2_pauli_list.append((N * 'I', F_x_2[j,j].real))
+        F_p_2_pauli_list.append((N * 'I', F_p_2[j,j].real))
+        op = n * ['I']
+        op[(j-1)%n] = 'Z'
+        F_x_2_pauli_list.append((N * 'I', (-1) ** (b) * F_x_2[j,j].real))
+        F_p_2_pauli_list.append((N * 'I', (-1) ** (b) * F_p_2[j,j].real))
+        op = n * ['I']
+        op[j%n] = 'Z'
+        F_x_2_pauli_list.append((N * 'I', (-1) ** (c) * F_x_2[j,j].real))
+        F_p_2_pauli_list.append((N * 'I', (-1) ** (c) * F_p_2[j,j].real))
+        op = n * ['I']
+        op[j%n] = 'Z'
+        op[(j-1)%n] = 'Z'
+        F_x_2_pauli_list.append((N * 'I', (-1) ** (c + b) * F_x_2[j,j].real))
+        F_p_2_pauli_list.append((N * 'I', (-1) ** (c + b) * F_p_2[j,j].real))
+
+
+    for j in range(N):
+        # Diagonal part
+        op = n * ['I']
+        D_x_pauli_list.append((N * 'I', D_x[j,j].real))
+        D_p_pauli_list.append((N * 'I', D_p[j,j].real))
+        op = n * ['I']
+        op[(j-1)%n] = 'Z'
+        D_x_pauli_list.append((N * 'I', (-1) ** (b) * D_x[j,j].real))
+        D_p_pauli_list.append((N * 'I', (-1) ** (b) * D_p[j,j].real))
+        op = n * ['I']
+        op[j%n] = 'Z'
+        D_x_pauli_list.append((N * 'I', (-1) ** (c) * D_x[j,j].real))
+        D_p_pauli_list.append((N * 'I', (-1) ** (c) * D_p[j,j].real))
+        op = n * ['I']
+        op[j%n] = 'Z'
+        op[(j-1)%n] = 'Z'
+        D_x_pauli_list.append((N * 'I', (-1) ** (c + b) * D_x[j,j].real))
+        D_p_pauli_list.append((N * 'I', (-1) ** (c + b) * D_p[j,j].real))
+
+
+    F_x_1_pauli_op_grouped = SparsePauliOp.from_list(F_x_1_pauli_list).simplify().group_commuting()
+    F_x_2_pauli_op_grouped = SparsePauliOp.from_list(F_x_2_pauli_list).simplify().group_commuting()
+    F_p_1_pauli_op_grouped = SparsePauliOp.from_list(F_p_1_pauli_list).simplify().group_commuting()
+    F_p_2_pauli_op_grouped = SparsePauliOp.from_list(F_p_2_pauli_list).simplify().group_commuting()
+    D_x_pauli_op = SparsePauliOp.from_list(D_x_pauli_list).simplify()
+    D_p_pauli_op = SparsePauliOp.from_list(D_p_pauli_list).simplify()
+    H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
+    Id_n_p = SparsePauliOp.from_list([(n_p * 'I', 1)])
+
+    F_x_1_sp_mats = []
+    for j in range(len(F_x_1_pauli_op_grouped)):
+        F_x_1_sp_mats.append(F_x_1_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
+    F_p_1_sp_mats = []
+    for j in range(len(F_p_1_pauli_op_grouped)):
+        F_p_1_sp_mats.append(F_p_1_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
+    F_x_2_sp_mats = []
+    for j in range(len(F_x_2_pauli_op_grouped)):
+        F_x_2_sp_mats.append(F_x_2_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
+    F_p_2_sp_mats = []
+    for j in range(len(F_p_2_pauli_op_grouped)):
+        F_p_2_sp_mats.append(F_p_2_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
+
+    H = []
+    H_sp_mats = []
+
+    # Hermitian part
+    for j in range(len(F_x_1_pauli_op_grouped)):
+        H.append(F_x_1_pauli_op_grouped[j].tensor(D_p_pauli_op).tensor(H_F_pauli_op))
+        H_sp_mats.append(tensor([F_x_1_sp_mats[j], D_p, H_F_pauli_op.to_matrix(sparse=True)]))
+                
+    for j in range(len(F_p_1_pauli_op_grouped)):
+        H.append(D_x_pauli_op.tensor(F_p_1_pauli_op_grouped[j]).tensor(H_F_pauli_op))
+        H_sp_mats.append(tensor([D_x, F_p_1_sp_mats[j], H_F_pauli_op.to_matrix(sparse=True)]))
+    
+    # Anti-Hermitian part
+    for j in range(len(F_x_2_pauli_op_grouped)):
+        H.append(F_x_2_pauli_op_grouped[j].tensor(D_p_pauli_op).tensor(Id_n_p))
+        H_sp_mats.append(-tensor([F_x_2_sp_mats[j], D_p, identity(N_p)]))
+    for j in range(len(F_p_2_pauli_op_grouped)):
+        H.append(D_x_pauli_op.tensor(F_p_2_pauli_op_grouped[j]).tensor(Id_n_p))
+        H_sp_mats.append(-tensor([D_x, F_p_2_sp_mats[j], identity(N_p)]))
+
+    return H, H_sp_mats
+
 
 def get_gate_count_per_trotter_step(H, trotter_method="second_order"):
     num_single_qubit_gates, num_two_qubit_gates = 0, 0
@@ -380,6 +571,11 @@ if __name__ == "__main__":
     one_hot_two_qubit_gates = np.zeros_like(N_vals)
     one_hot_circ_depth = np.zeros_like(N_vals)
 
+    unary_trotter_steps = np.zeros_like(N_vals)
+    unary_single_qubit_gates = np.zeros_like(N_vals)
+    unary_two_qubit_gates = np.zeros_like(N_vals)
+    unary_circ_depth = np.zeros_like(N_vals)
+
     for i, N in enumerate(N_vals):
         n_x = n_vals[i]
         # Gate counts per Trotter step
@@ -398,7 +594,15 @@ if __name__ == "__main__":
         one_hot_single_qubit_gates[i], one_hot_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_one_hot, trotter_method)
         one_hot_circ_depth[i] = get_circuit_depth(2 * N + n_p, H_one_hot)
 
-        np.savez(join("../resource_analysis_data", f"nonlinear_data_{trotter_method}.npz"),
+        '''Unary encoding (ours)'''
+        H_unary, H_unary_sp_mats = get_H_unary(N, n_p, R)
+        print("Computing Trotter steps for unary encoding.", flush=True)
+        unary_trotter_steps[i] = get_first_order_trotter_steps(T, H_unary_sp_mats, error_tol)
+        print("Computing gates per Trotter step for unary.", flush=True)
+        unary_single_qubit_gates[i], unary_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_unary, trotter_method)
+        unary_circ_depth[i] = get_circuit_depth(2 * N + n_p, H_unary)
+
+        np.savez(join("../resource_analysis_data", f"nonlinear_data_{trotter_method}_unary.npz"),
                 N_vals=N_vals,
                 pauli_basis_trotter_steps=pauli_basis_trotter_steps[:i+1],
                 pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates[:i+1],
@@ -407,7 +611,11 @@ if __name__ == "__main__":
                 one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
                 one_hot_single_qubit_gates=one_hot_single_qubit_gates[:i+1],
                 one_hot_two_qubit_gates=one_hot_two_qubit_gates[:i+1],
-                one_hot_circ_depth=one_hot_circ_depth[:i+1])
+                one_hot_circ_depth=one_hot_circ_depth[:i+1],
+                unary_trotter_steps=unary_trotter_steps[:i+1],
+                unary_single_qubit_gates=unary_single_qubit_gates[:i+1],
+                unary_two_qubit_gates=unary_two_qubit_gates[:i+1],
+                unary_circ_depth=unary_circ_depth[:i+1])
 
     end_time = time()
     print(f"Runtime: {end_time - start_time}", flush=True)
