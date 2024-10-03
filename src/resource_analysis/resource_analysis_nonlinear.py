@@ -104,11 +104,27 @@ def get_H_std_binary(N, n_p, R):
 
     return H, H_sp_mats
 
+def decompose_tridiag_mat(A):
+    N = A.shape[0]
+    sp_mat_even = np.zeros((N,N), dtype=np.complex128)
+    sp_mat_odd = np.zeros((N,N), dtype=np.complex128)
+    sp_mat_diag = np.zeros((N,N), dtype=np.complex128)
+
+    for j in range(N):
+        if j % 2 == 0:
+            sp_mat_even[j,(j+1)%N] = A[j,(j+1)%N]
+            sp_mat_even[(j+1)%N,j] = A[(j+1)%N,j]
+        else:
+            sp_mat_odd[j,(j+1)%N] = A[j,(j+1)%N]
+            sp_mat_odd[(j+1)%N,j] = A[(j+1)%N,j]
+        sp_mat_diag[j,j] = A[j,j]
+
+    return csc_matrix(sp_mat_even), csc_matrix(sp_mat_odd), csc_matrix(sp_mat_diag)
+
 def get_H_one_hot(N, n_p, R):
 
     h = 1 / N
     N_p = 2 ** n_p
-    codewords = get_codewords(N, dimension=1, encoding="one-hot")
 
     F_x = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
@@ -144,10 +160,16 @@ def get_H_one_hot(N, n_p, R):
 
 
 
-    F_x_1_pauli_list = []
-    F_x_2_pauli_list = []
-    F_p_1_pauli_list = []
-    F_p_2_pauli_list = []
+    F_x_1_pauli_list_even = []
+    F_x_1_pauli_list_odd = []
+    F_x_1_pauli_list_diag = []
+    F_x_2_pauli_list_even = []
+    F_x_2_pauli_list_odd = []
+    F_p_1_pauli_list_even = []
+    F_p_1_pauli_list_odd = []
+    F_p_1_pauli_list_diag = []
+    F_p_2_pauli_list_even = []
+    F_p_2_pauli_list_odd = []
     D_x_pauli_list = []
     D_p_pauli_list = []
 
@@ -155,41 +177,51 @@ def get_H_one_hot(N, n_p, R):
         op = N * ['I']
         op[j] = 'X'
         op[(j+1)%N] = 'X'
-        F_x_1_pauli_list.append((''.join(op), 0.5*F_x_1[(j+1)%N,j].real))
-        F_p_1_pauli_list.append((''.join(op), 0.5*F_p_1[(j+1)%N,j].real))
+        if j % 2 == 0:
+            F_x_1_pauli_list_even.append((''.join(op), 0.5*F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_even.append((''.join(op), 0.5*F_p_1[(j+1)%N,j].real))
+        else:
+            F_x_1_pauli_list_odd.append((''.join(op), 0.5*F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_odd.append((''.join(op), 0.5*F_p_1[(j+1)%N,j].real))
+            
 
         op = N * ['I']
         op[j] = 'Y'
         op[(j+1)%N] = 'Y'
-        F_x_1_pauli_list.append((''.join(op), 0.5*F_x_1[(j+1)%N,j].real))
-        F_p_1_pauli_list.append((''.join(op), 0.5*F_p_1[(j+1)%N,j].real))
+        if j % 2 == 0:
+            F_x_1_pauli_list_even.append((''.join(op), 0.5*F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_even.append((''.join(op), 0.5*F_p_1[(j+1)%N,j].real))
+        else:
+            F_x_1_pauli_list_odd.append((''.join(op), 0.5*F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_odd.append((''.join(op), 0.5*F_p_1[(j+1)%N,j].real))
 
-        F_x_1_pauli_list.append((N * 'I', 0.5 * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((N * 'I', 0.5 * F_p_1[j,j].real))
+        F_x_1_pauli_list_diag.append((N * 'I', 0.5 * F_x_1[j,j].real))
+        F_p_1_pauli_list_diag.append((N * 'I', 0.5 * F_p_1[j,j].real))
         op = N * ['I']
         op[j] = 'Z'
-        F_x_1_pauli_list.append((''.join(op), -0.5 * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((''.join(op), -0.5 * F_p_1[j,j].real))
+        F_x_1_pauli_list_diag.append((''.join(op), -0.5 * F_x_1[j,j].real))
+        F_p_1_pauli_list_diag.append((''.join(op), -0.5 * F_p_1[j,j].real))
 
     for j in range(N):
         op = N * ['I']
         op[j] = 'X'
         op[(j+1)%N] = 'Y'
-        F_x_2_pauli_list.append((''.join(op), 0.5*F_x_2[(j+1)%N,j].imag))
-        F_p_2_pauli_list.append((''.join(op), 0.5*F_p_2[(j+1)%N,j].imag))
+        if j % 2 == 0:
+            F_x_2_pauli_list_even.append((''.join(op), 0.5*F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_even.append((''.join(op), 0.5*F_p_2[(j+1)%N,j].imag))
+        else:
+            F_x_2_pauli_list_odd.append((''.join(op), 0.5*F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_odd.append((''.join(op), 0.5*F_p_2[(j+1)%N,j].imag))
 
         op = N * ['I']
         op[j] = 'Y'
         op[(j+1)%N] = 'X'
-        F_x_2_pauli_list.append((''.join(op), -0.5*F_x_2[(j+1)%N,j].imag))
-        F_p_2_pauli_list.append((''.join(op), -0.5*F_p_2[(j+1)%N,j].imag))
-
-        F_x_2_pauli_list.append((N * 'I', 0.5 * F_x_2[j,j].real))
-        F_p_2_pauli_list.append((N * 'I', 0.5 * F_p_2[j,j].real))
-        op = N * ['I']
-        op[j] = 'Z'
-        F_x_2_pauli_list.append((''.join(op), -0.5 * F_x_2[j,j].real))
-        F_p_2_pauli_list.append((''.join(op), -0.5 * F_p_2[j,j].real))
+        if j % 2 == 0:
+            F_x_2_pauli_list_even.append((''.join(op), -0.5*F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_even.append((''.join(op), -0.5*F_p_2[(j+1)%N,j].imag))
+        else:
+            F_x_2_pauli_list_odd.append((''.join(op), -0.5*F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_odd.append((''.join(op), -0.5*F_p_2[(j+1)%N,j].imag))
 
     for j in range(N):
         D_x_pauli_list.append((N * 'I', 0.5 * D_x[j,j].real))
@@ -202,27 +234,33 @@ def get_H_one_hot(N, n_p, R):
         op[j] = 'Z'
         D_p_pauli_list.append((''.join(op), -0.5 * D_p[j,j].real))
 
-    F_x_1_pauli_op_grouped = SparsePauliOp.from_list(F_x_1_pauli_list).simplify().group_commuting()
-    F_x_2_pauli_op_grouped = SparsePauliOp.from_list(F_x_2_pauli_list).simplify().group_commuting()
-    F_p_1_pauli_op_grouped = SparsePauliOp.from_list(F_p_1_pauli_list).simplify().group_commuting()
-    F_p_2_pauli_op_grouped = SparsePauliOp.from_list(F_p_2_pauli_list).simplify().group_commuting()
+    F_x_1_pauli_op_grouped = [SparsePauliOp.from_list(F_x_1_pauli_list_even).simplify(),
+                                SparsePauliOp.from_list(F_x_1_pauli_list_odd).simplify(),
+                                SparsePauliOp.from_list(F_x_1_pauli_list_diag).simplify()]
+    F_x_2_pauli_op_grouped = [SparsePauliOp.from_list(F_x_2_pauli_list_even).simplify(),
+                                SparsePauliOp.from_list(F_x_2_pauli_list_odd).simplify()]
+    F_p_1_pauli_op_grouped = [SparsePauliOp.from_list(F_p_1_pauli_list_even).simplify(),
+                                SparsePauliOp.from_list(F_p_1_pauli_list_odd).simplify(),
+                                SparsePauliOp.from_list(F_p_1_pauli_list_diag).simplify()]
+    F_p_2_pauli_op_grouped = [SparsePauliOp.from_list(F_p_2_pauli_list_even).simplify(),
+                                SparsePauliOp.from_list(F_p_2_pauli_list_odd).simplify()]
+    
     D_x_pauli_op = SparsePauliOp.from_list(D_x_pauli_list).simplify()
     D_p_pauli_op = SparsePauliOp.from_list(D_p_pauli_list).simplify()
     H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
     Id_n_p = SparsePauliOp.from_list([(n_p * 'I', 1)])
 
-    F_x_1_sp_mats = []
-    for j in range(len(F_x_1_pauli_op_grouped)):
-        F_x_1_sp_mats.append(F_x_1_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
-    F_p_1_sp_mats = []
-    for j in range(len(F_p_1_pauli_op_grouped)):
-        F_p_1_sp_mats.append(F_p_1_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
-    F_x_2_sp_mats = []
-    for j in range(len(F_x_2_pauli_op_grouped)):
-        F_x_2_sp_mats.append(F_x_2_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
-    F_p_2_sp_mats = []
-    for j in range(len(F_p_2_pauli_op_grouped)):
-        F_p_2_sp_mats.append(F_p_2_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
+    sp_mat_even, sp_mat_odd, sp_mat_diag = decompose_tridiag_mat(F_x_1)
+    F_x_1_sp_mats = [sp_mat_even, sp_mat_odd, sp_mat_diag]
+    
+    sp_mat_even, sp_mat_odd, sp_mat_diag = decompose_tridiag_mat(F_p_1)
+    F_p_1_sp_mats = [sp_mat_even, sp_mat_odd, sp_mat_diag]
+    
+    sp_mat_even, sp_mat_odd, sp_mat_diag = decompose_tridiag_mat(F_x_2)
+    F_x_2_sp_mats = [sp_mat_even, sp_mat_odd]
+    
+    sp_mat_even, sp_mat_odd, sp_mat_diag = decompose_tridiag_mat(F_p_2)
+    F_p_2_sp_mats = [sp_mat_even, sp_mat_odd]
 
     H = []
     H_sp_mats = []
@@ -250,7 +288,6 @@ def get_H_unary(N, n_p, R):
     n = N // 2
     h = 1 / N
     N_p = 2 ** n_p
-    codewords = get_codewords(N, dimension=1, encoding="unary", periodic=True)
 
     F_x = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
@@ -286,10 +323,16 @@ def get_H_unary(N, n_p, R):
 
 
 
-    F_x_1_pauli_list = []
-    F_x_2_pauli_list = []
-    F_p_1_pauli_list = []
-    F_p_2_pauli_list = []
+    F_x_1_pauli_list_even = []
+    F_x_1_pauli_list_odd = []
+    F_x_1_pauli_list_diag = []
+    F_x_2_pauli_list_even = []
+    F_x_2_pauli_list_odd = []
+    F_p_1_pauli_list_even = []
+    F_p_1_pauli_list_odd = []
+    F_p_1_pauli_list_diag = []
+    F_p_2_pauli_list_even = []
+    F_p_2_pauli_list_odd = []
     D_x_pauli_list = []
     D_p_pauli_list = []
 
@@ -312,46 +355,63 @@ def get_H_unary(N, n_p, R):
         # Real part
         op = n * ['I']
         op[j%n] = 'X'
-        F_x_1_pauli_list.append((''.join(op), ((-1) ** 0 / 4) * F_x_1[(j+1)%N,j].real))
-        F_p_1_pauli_list.append((''.join(op), ((-1) ** 0 / 4) * F_p_1[(j+1)%N,j].real))
+        if j % 2 == 0:
+            F_x_1_pauli_list_even.append((''.join(op), ((-1) ** 0 / 4) * F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_even.append((''.join(op), ((-1) ** 0 / 4) * F_p_1[(j+1)%N,j].real))
+        else:
+            F_x_1_pauli_list_odd.append((''.join(op), ((-1) ** 0 / 4) * F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_odd.append((''.join(op), ((-1) ** 0 / 4) * F_p_1[(j+1)%N,j].real))
+
 
         op = n * ['I']
         op[j%n] = 'X'
         op[(j-1)%n] = 'Z'
-        F_x_1_pauli_list.append((''.join(op), ((-1) ** (a+0) / 4) * F_x_1[(j+1)%N,j].real))
-        F_p_1_pauli_list.append((''.join(op), ((-1) ** (a+0) / 4) * F_p_1[(j+1)%N,j].real))
-        
+        if j % 2 == 0:
+            F_x_1_pauli_list_even.append((''.join(op), ((-1) ** (a+0) / 4) * F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_even.append((''.join(op), ((-1) ** (a+0) / 4) * F_p_1[(j+1)%N,j].real))
+        else:
+            F_x_1_pauli_list_odd.append((''.join(op), ((-1) ** (a+0) / 4) * F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_odd.append((''.join(op), ((-1) ** (a+0) / 4) * F_p_1[(j+1)%N,j].real))
+
         op = n * ['I']
         op[j%n] = 'X'
         op[(j+1)%n] = 'Z'
-        F_x_1_pauli_list.append((''.join(op), ((-1) ** (b+0) / 4) * F_x_1[(j+1)%N,j].real))
-        F_p_1_pauli_list.append((''.join(op), ((-1) ** (b+0) / 4) * F_p_1[(j+1)%N,j].real))
+        if j % 2 == 0:
+            F_x_1_pauli_list_even.append((''.join(op), ((-1) ** (b+0) / 4) * F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_even.append((''.join(op), ((-1) ** (b+0) / 4) * F_p_1[(j+1)%N,j].real))
+        else:
+            F_x_1_pauli_list_odd.append((''.join(op), ((-1) ** (b+0) / 4) * F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_odd.append((''.join(op), ((-1) ** (b+0) / 4) * F_p_1[(j+1)%N,j].real))
 
         op = n * ['I']
         op[(j-1)%n] = 'Z'
         op[j%n] = 'X'
         op[(j+1)%n] = 'Z'
-        F_x_1_pauli_list.append((''.join(op), ((-1) ** (a+b+0) / 4) * F_x_1[(j+1)%N,j].real))
-        F_p_1_pauli_list.append((''.join(op), ((-1) ** (a+b+0) / 4) * F_p_1[(j+1)%N,j].real))
-        
+        if j % 2 == 0:
+            F_x_1_pauli_list_even.append((''.join(op), ((-1) ** (a+b+0) / 4) * F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_even.append((''.join(op), ((-1) ** (a+b+0) / 4) * F_p_1[(j+1)%N,j].real))
+        else:
+            F_x_1_pauli_list_odd.append((''.join(op), ((-1) ** (a+b+0) / 4) * F_x_1[(j+1)%N,j].real))
+            F_p_1_pauli_list_odd.append((''.join(op), ((-1) ** (a+b+0) / 4) * F_p_1[(j+1)%N,j].real))
+
 
         # Diagonal part
         op = n * ['I']
-        F_x_1_pauli_list.append((''.join(op), F_x_1[j,j].real))
-        F_p_1_pauli_list.append((''.join(op), F_p_1[j,j].real))
+        F_x_1_pauli_list_diag.append((''.join(op), F_x_1[j,j].real))
+        F_p_1_pauli_list_diag.append((''.join(op), F_p_1[j,j].real))
         op = n * ['I']
         op[(j-1)%n] = 'Z'
-        F_x_1_pauli_list.append((''.join(op), (-1) ** (b) * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((''.join(op), (-1) ** (b) * F_p_1[j,j].real))
+        F_x_1_pauli_list_diag.append((''.join(op), (-1) ** (b) * F_x_1[j,j].real))
+        F_p_1_pauli_list_diag.append((''.join(op), (-1) ** (b) * F_p_1[j,j].real))
         op = n * ['I']
         op[j%n] = 'Z'
-        F_x_1_pauli_list.append((''.join(op), (-1) ** (c) * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((''.join(op), (-1) ** (c) * F_p_1[j,j].real))
+        F_x_1_pauli_list_diag.append((''.join(op), (-1) ** (c) * F_x_1[j,j].real))
+        F_p_1_pauli_list_diag.append((''.join(op), (-1) ** (c) * F_p_1[j,j].real))
         op = n * ['I']
         op[j%n] = 'Z'
         op[(j-1)%n] = 'Z'
-        F_x_1_pauli_list.append((''.join(op), (-1) ** (c + b) * F_x_1[j,j].real))
-        F_p_1_pauli_list.append((''.join(op), (-1) ** (c + b) * F_p_1[j,j].real))
+        F_x_1_pauli_list_diag.append((''.join(op), (-1) ** (c + b) * F_x_1[j,j].real))
+        F_p_1_pauli_list_diag.append((''.join(op), (-1) ** (c + b) * F_p_1[j,j].real))
 
     for j in range(N):
         if n - 1 <= j < N - 1:
@@ -372,45 +432,44 @@ def get_H_unary(N, n_p, R):
         # Imag part
         op = n * ['I']
         op[j%n] = 'Y'
-        F_x_2_pauli_list.append((''.join(op), ((-1) ** c / 4) * F_x_2[(j+1)%N,j].imag))
-        F_p_2_pauli_list.append((''.join(op), ((-1) ** c / 4) * F_p_2[(j+1)%N,j].imag))
+        if j % 2 == 0:
+            F_x_2_pauli_list_even.append((''.join(op), ((-1) ** c / 4) * F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_even.append((''.join(op), ((-1) ** c / 4) * F_p_2[(j+1)%N,j].imag))
+        else:
+            F_x_2_pauli_list_odd.append((''.join(op), ((-1) ** c / 4) * F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_odd.append((''.join(op), ((-1) ** c / 4) * F_p_2[(j+1)%N,j].imag))
 
         op = n * ['I']
         op[j%n] = 'Y'
         op[(j-1)%n] = 'Z'
-        F_x_2_pauli_list.append((''.join(op), (- (-1) ** (a+c) / 4) * F_x_2[(j+1)%N,j].imag))
-        F_p_2_pauli_list.append((''.join(op), (- (-1) ** (a+c) / 4) * F_p_2[(j+1)%N,j].imag))
-        
+        if j % 2 == 0:
+            F_x_2_pauli_list_even.append((''.join(op), (- (-1) ** (a+c) / 4) * F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_even.append((''.join(op), (- (-1) ** (a+c) / 4) * F_p_2[(j+1)%N,j].imag))
+        else:
+            F_x_2_pauli_list_odd.append((''.join(op), (- (-1) ** (a+c) / 4) * F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_odd.append((''.join(op), (- (-1) ** (a+c) / 4) * F_p_2[(j+1)%N,j].imag))
+
         op = n * ['I']
         op[j%n] = 'Y'
         op[(j+1)%n] = 'Z'
-        F_x_2_pauli_list.append((''.join(op), (- (-1) ** (b+c) / 4) * F_x_2[(j+1)%N,j].imag))
-        F_p_2_pauli_list.append((''.join(op), (- (-1) ** (b+c) / 4) * F_p_2[(j+1)%N,j].imag))
+        if j % 2 == 0:
+            F_x_2_pauli_list_even.append((''.join(op), (- (-1) ** (b+c) / 4) * F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_even.append((''.join(op), (- (-1) ** (b+c) / 4) * F_p_2[(j+1)%N,j].imag))
+        else:
+            F_x_2_pauli_list_odd.append((''.join(op), (- (-1) ** (b+c) / 4) * F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_odd.append((''.join(op), (- (-1) ** (b+c) / 4) * F_p_2[(j+1)%N,j].imag))
 
         op = n * ['I']
         op[(j-1)%n] = 'Z'
         op[j%n] = 'Y'
         op[(j+1)%n] = 'Z'
-        F_x_2_pauli_list.append((''.join(op), ((-1) ** (a+b+c) / 4) * F_x_2[(j+1)%N,j].imag))
-        F_p_2_pauli_list.append((''.join(op), ((-1) ** (a+b+c) / 4) * F_p_2[(j+1)%N,j].imag))
+        if j % 2 == 0:
+            F_x_2_pauli_list_even.append((''.join(op), ((-1) ** (a+b+c) / 4) * F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_even.append((''.join(op), ((-1) ** (a+b+c) / 4) * F_p_2[(j+1)%N,j].imag))
+        else:
+            F_x_2_pauli_list_odd.append((''.join(op), ((-1) ** (a+b+c) / 4) * F_x_2[(j+1)%N,j].imag))
+            F_p_2_pauli_list_odd.append((''.join(op), ((-1) ** (a+b+c) / 4) * F_p_2[(j+1)%N,j].imag))
 
-        # Diagonal part
-        op = n * ['I']
-        F_x_2_pauli_list.append((''.join(op), F_x_2[j,j].real))
-        F_p_2_pauli_list.append((''.join(op), F_p_2[j,j].real))
-        op = n * ['I']
-        op[(j-1)%n] = 'Z'
-        F_x_2_pauli_list.append((''.join(op), (-1) ** (b) * F_x_2[j,j].real))
-        F_p_2_pauli_list.append((''.join(op), (-1) ** (b) * F_p_2[j,j].real))
-        op = n * ['I']
-        op[j%n] = 'Z'
-        F_x_2_pauli_list.append((''.join(op), (-1) ** (c) * F_x_2[j,j].real))
-        F_p_2_pauli_list.append((''.join(op), (-1) ** (c) * F_p_2[j,j].real))
-        op = n * ['I']
-        op[j%n] = 'Z'
-        op[(j-1)%n] = 'Z'
-        F_x_2_pauli_list.append((''.join(op), (-1) ** (c + b) * F_x_2[j,j].real))
-        F_p_2_pauli_list.append((''.join(op), (-1) ** (c + b) * F_p_2[j,j].real))
 
 
     for j in range(N):
@@ -433,27 +492,33 @@ def get_H_unary(N, n_p, R):
         D_p_pauli_list.append((''.join(op), (-1) ** (c + b) * D_p[j,j].real))
 
 
-    F_x_1_pauli_op_grouped = SparsePauliOp.from_list(F_x_1_pauli_list).simplify().group_commuting()
-    F_x_2_pauli_op_grouped = SparsePauliOp.from_list(F_x_2_pauli_list).simplify().group_commuting()
-    F_p_1_pauli_op_grouped = SparsePauliOp.from_list(F_p_1_pauli_list).simplify().group_commuting()
-    F_p_2_pauli_op_grouped = SparsePauliOp.from_list(F_p_2_pauli_list).simplify().group_commuting()
+    F_x_1_pauli_op_grouped = [SparsePauliOp.from_list(F_x_1_pauli_list_even).simplify(),
+                                SparsePauliOp.from_list(F_x_1_pauli_list_odd).simplify(),
+                                SparsePauliOp.from_list(F_x_1_pauli_list_diag).simplify()]
+    F_x_2_pauli_op_grouped = [SparsePauliOp.from_list(F_x_2_pauli_list_even).simplify(),
+                                SparsePauliOp.from_list(F_x_2_pauli_list_odd).simplify()]
+    F_p_1_pauli_op_grouped = [SparsePauliOp.from_list(F_p_1_pauli_list_even).simplify(),
+                                SparsePauliOp.from_list(F_p_1_pauli_list_odd).simplify(),
+                                SparsePauliOp.from_list(F_p_1_pauli_list_diag).simplify()]
+    F_p_2_pauli_op_grouped = [SparsePauliOp.from_list(F_p_2_pauli_list_even).simplify(),
+                                SparsePauliOp.from_list(F_p_2_pauli_list_odd).simplify()]
+    
     D_x_pauli_op = SparsePauliOp.from_list(D_x_pauli_list).simplify()
     D_p_pauli_op = SparsePauliOp.from_list(D_p_pauli_list).simplify()
     H_F_pauli_op = (-get_xi_pauli_op(n_p, R))
     Id_n_p = SparsePauliOp.from_list([(n_p * 'I', 1)])
 
-    F_x_1_sp_mats = []
-    for j in range(len(F_x_1_pauli_op_grouped)):
-        F_x_1_sp_mats.append(F_x_1_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
-    F_p_1_sp_mats = []
-    for j in range(len(F_p_1_pauli_op_grouped)):
-        F_p_1_sp_mats.append(F_p_1_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
-    F_x_2_sp_mats = []
-    for j in range(len(F_x_2_pauli_op_grouped)):
-        F_x_2_sp_mats.append(F_x_2_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
-    F_p_2_sp_mats = []
-    for j in range(len(F_p_2_pauli_op_grouped)):
-        F_p_2_sp_mats.append(F_p_2_pauli_op_grouped[j].to_matrix(sparse=True)[codewords][:,codewords])
+    sp_mat_even, sp_mat_odd, sp_mat_diag = decompose_tridiag_mat(F_x_1)
+    F_x_1_sp_mats = [sp_mat_even, sp_mat_odd, sp_mat_diag]
+    
+    sp_mat_even, sp_mat_odd, sp_mat_diag = decompose_tridiag_mat(F_p_1)
+    F_p_1_sp_mats = [sp_mat_even, sp_mat_odd, sp_mat_diag]
+    
+    sp_mat_even, sp_mat_odd, sp_mat_diag = decompose_tridiag_mat(F_x_2)
+    F_x_2_sp_mats = [sp_mat_even, sp_mat_odd]
+    
+    sp_mat_even, sp_mat_odd, sp_mat_diag = decompose_tridiag_mat(F_p_2)
+    F_p_2_sp_mats = [sp_mat_even, sp_mat_odd]
 
     H = []
     H_sp_mats = []
@@ -602,8 +667,8 @@ if __name__ == "__main__":
         unary_single_qubit_gates[i], unary_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_unary, trotter_method)
         unary_circ_depth[i] = get_circuit_depth(2 * (N // 2) + n_p, H_unary)
 
-        np.savez(join("../resource_analysis_data", f"nonlinear_data_{trotter_method}_unary.npz"),
-                N_vals=N_vals,
+        np.savez(join("../resource_analysis_data", f"nonlinear_data.npz"),
+                N_vals=N_vals[:i+1],
                 pauli_basis_trotter_steps=pauli_basis_trotter_steps[:i+1],
                 pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates[:i+1],
                 pauli_basis_two_qubit_gates=pauli_basis_two_qubit_gates[:i+1],
