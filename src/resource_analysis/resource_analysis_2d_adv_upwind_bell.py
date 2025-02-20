@@ -41,14 +41,12 @@ if __name__ == "__main__":
     trotter_method="second_order"
 
     print("Computing Trotter steps.")
-    bell_basis_single_qubit_gates = np.zeros_like(N_vals_bell_basis)
-    bell_basis_two_qubit_gates = np.zeros_like(N_vals_bell_basis)
     bell_basis_circ_depth = np.zeros_like(N_vals_bell_basis)
     bell_basis_trotter_steps = np.zeros_like(N_vals_bell_basis)
 
     # Gate counts per Trotter step
     for i, n_x in enumerate(n_vals_bell_basis):
-        bell_basis_single_qubit_gates[i], bell_basis_two_qubit_gates[i], bell_basis_circ_depth[i] = bell_basis_gate_count_per_trotter_step(n_x, n_p, R, T)
+        bell_basis_circ_depth[i] = bell_basis_depth_per_trotter_step(n_x, n_p, R, T)
         '''Schrodingerization w/ Bell basis'''
         bell_basis_trotter_steps[i] = get_trotter_number_bell_basis(n_x, n_p, R, T, error_tol / dimension, num_samples, num_jobs)
         print("Bell basis Trotter steps:", bell_basis_trotter_steps[i], flush=True)
@@ -58,8 +56,6 @@ if __name__ == "__main__":
             n_vals_bell_basis=n_vals_bell_basis[:i+1],
             N_vals_bell_basis=N_vals_bell_basis[:i+1],
             bell_basis_trotter_steps=bell_basis_trotter_steps[:i+1],
-            bell_basis_single_qubit_gates=bell_basis_single_qubit_gates[:i+1],
-            bell_basis_two_qubit_gates=bell_basis_two_qubit_gates[:i+1],
             bell_basis_circ_depth=bell_basis_circ_depth[:i+1])
 
     end_time = time()

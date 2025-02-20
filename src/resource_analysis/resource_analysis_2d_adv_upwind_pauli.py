@@ -42,8 +42,6 @@ if __name__ == "__main__":
 
 
     print("Computing Trotter steps.")
-    pauli_basis_single_qubit_gates = np.zeros_like(N_vals_binary)
-    pauli_basis_two_qubit_gates = np.zeros_like(N_vals_binary)
     pauli_basis_circ_depth = np.zeros_like(N_vals_binary)
     pauli_basis_trotter_steps = np.zeros_like(N_vals_binary)
 
@@ -51,7 +49,7 @@ if __name__ == "__main__":
         print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}", flush=True)
 
         '''Schrodingerization w/ Pauli basis'''
-        pauli_basis_single_qubit_gates[i], pauli_basis_two_qubit_gates[i], pauli_basis_circ_depth[i] = pauli_basis_gate_count_per_trotter_step(n_vals_binary[i], n_p, R, T, trotter_method)
+        pauli_basis_circ_depth[i] = pauli_basis_depth_per_trotter_step(n_vals_binary[i], n_p, R, T, trotter_method)
         pauli_basis_trotter_steps[i] = get_trotter_number_pauli_basis(n_vals_binary[i], n_p, R, T, error_tol / dimension, num_samples, num_jobs)
         print("Pauli basis Trotter steps:", pauli_basis_trotter_steps[i], flush=True)
 
@@ -59,8 +57,6 @@ if __name__ == "__main__":
                 n_vals_binary=n_vals_binary[:i+1],
                 N_vals_binary=N_vals_binary[:i+1],
                 pauli_basis_trotter_steps=pauli_basis_trotter_steps[:i+1],
-                pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates[:i+1],
-                pauli_basis_two_qubit_gates=pauli_basis_two_qubit_gates[:i+1],
                 pauli_basis_circ_depth=pauli_basis_circ_depth[:i+1])
 
     end_time = time()
