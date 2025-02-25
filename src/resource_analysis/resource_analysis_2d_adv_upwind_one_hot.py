@@ -30,7 +30,7 @@ if __name__ == "__main__":
     start_time = time()
     dimension = 2
     error_tol = 5e-2
-    N_vals_one_hot = np.arange(4, 257, 2)
+    N_vals_one_hot = np.arange(4, 257, 4)
     n_p = 5                                     # num qubits for p
     N_p = 2 ** n_p
     T = 1
@@ -42,20 +42,22 @@ if __name__ == "__main__":
 
     print("Computing Trotter steps.")
     one_hot_circ_depth = np.zeros_like(N_vals_one_hot)
+    one_hot_two_qubit_gates = np.zeros_like(N_vals_one_hot)
     one_hot_trotter_steps = np.zeros_like(N_vals_one_hot)
 
     for i, N in enumerate(N_vals_one_hot):
         print(f"Estimating gate counts for dimension {dimension}, error_tol={error_tol:0.2e}", flush=True)
 
         '''One-hot encoding (ours)'''
-        one_hot_circ_depth[i] = one_hot_depth_per_trotter_step(N, n_p, R, trotter_method)
+        one_hot_circ_depth[i], one_hot_two_qubit_gates[i] = one_hot_resources_per_trotter_step(N, n_p, R, trotter_method)
         one_hot_trotter_steps[i] = get_trotter_number_one_hot_or_unary(N, N_p, R, T, error_tol / dimension, num_samples, num_jobs)
-        print("One-hot Trotter steps:", one_hot_trotter_steps[i], flush=True)
+        print("One-hot Trott~er steps:", one_hot_trotter_steps[i], flush=True)
 
         np.savez(join("../resource_analysis_data", "2d_advection_upwind", "separable_one_hot_data.npz"),
                 N_vals_one_hot=N_vals_one_hot[:i+1],
                 one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
-                one_hot_circ_depth=one_hot_circ_depth[:i+1])
+                one_hot_circ_depth=one_hot_circ_depth[:i+1],
+                one_hot_two_qubit_gates=one_hot_two_qubit_gates[:i+1])
 
     end_time = time()
     print(f"Runtime: {end_time - start_time}", flush=True)

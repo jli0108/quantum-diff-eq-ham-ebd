@@ -27,8 +27,9 @@ from utils import *
 def parallelize_ctrl_circuit(circuit):
     # Given an n-qubit circuit, perform a controlled version of the circuit using n+1 ancillas:.
     # For each layer of the circuit, perform the controlled version in parallel.
-    # Output: the depth and measurement rounds
+    # Output: the depth and two qubit gate count
     overall_depth = 0
+    two_qubit_gate_count = 0
     dag = circuit_to_dag(circuit)
 
     for layer in dag.layers():
@@ -43,9 +44,9 @@ def parallelize_ctrl_circuit(circuit):
             transpiled_qc = transpile(ctrl_qc, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
             if transpiled_qc.depth(lambda instr: len(instr.qubits) > 1) > max_depth:
                 max_depth = transpiled_qc.depth(lambda instr: len(instr.qubits) > 1)
-
+            two_qubit_gate_count += transpiled_qc.num_nonlocal_gates()
         overall_depth += max_depth
-    return overall_depth
+    return overall_depth, two_qubit_gate_count
 
 def estimate_one_step_trotter_error(N, N_p, R, dt, num_samples=1000, num_jobs=16):
 
@@ -134,7 +135,7 @@ def get_xi_pauli_op(n_p, R):
     xi_pauli_op = 0.5 * (2 * np.pi / (2 * R)) * SparsePauliOp.from_list(xi_pauli_list)
     return xi_pauli_op
 
-def one_hot_depth_per_trotter_step(N, n_p, R, trotter_method="second_order"):
+def one_hot_resources_per_trotter_step(N, n_p, R, trotter_method="second_order"):
     '''Gets the structure for the circuit with a single Trotter step'''
     H_1_pauli_list = []
     H_2_pauli_list = []
@@ -170,12 +171,13 @@ def one_hot_depth_per_trotter_step(N, n_p, R, trotter_method="second_order"):
         pauli_list.append((H_2_pauli_list[i][0], -H_2_pauli_list[i][1]))
 
     pauli_op = SparsePauliOp.from_list(pauli_list)
+    pauli_op_grouped = pauli_op.group_commuting()
 
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
     elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
     else:
         raise ValueError(f"{trotter_method} not supported")
 
@@ -183,134 +185,166 @@ def one_hot_depth_per_trotter_step(N, n_p, R, trotter_method="second_order"):
 
     # Gates per Trotter step
     depth_herm = compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
+    two_qubit_gate_count_herm = compiled_circuit.num_nonlocal_gates()
 
     # Next do H_1 \otimes H_F
     pauli_list = []
     for i in range(len(H_1_pauli_list)):
         pauli_list.append((H_1_pauli_list[i][0], -H_1_pauli_list[i][1]))
     
+    pauli_op = SparsePauliOp.from_list(pauli_list)
+    pauli_op_grouped = pauli_op.group_commuting()
+
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
     elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
     else:
         raise ValueError(f"{trotter_method} not supported")
-    
+
     compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-    depth_antiherm = parallelize_ctrl_circuit(compiled_circuit)
+    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(compiled_circuit)
     # The anti-Hermitian part contributes at most 2*n_p*depth_antiherm to the depth, since we need to control on each ancilla qubit.
     # The factor of two is for controlling on '0' and '1'; it may be that this factor can be eliminated.
-    return depth_herm + 2 * n_p * depth_antiherm
+    return depth_herm + 2 * n_p * depth_antiherm, two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm
 
-def unary_depth_per_trotter_step(N, n_p, R, trotter_method="second_order"):
+def unary_resources_per_trotter_step(N, n_p, R, trotter_method="second_order"):
     n = (N // 2)
+    assert n % 2 == 0, "Choose n to be even"
     '''Gets the structure for the circuit with a single Trotter step'''
-    H_1_pauli_list = []
-    H_2_pauli_list = []
+    H_1_pauli_list_even_1 = []
+    H_1_pauli_list_even_2 = []
+    H_1_pauli_list_odd_1 = []
+    H_1_pauli_list_odd_2 = []
+    H_2_pauli_list_even_1 = []
+    H_2_pauli_list_even_2 = []
+    H_2_pauli_list_odd_1 = []
+    H_2_pauli_list_odd_2 = []
 
     op = n * ['I']
-    H_1_pauli_list.append((''.join(op), 1))
+    H_1_pauli_list_even_1.append((''.join(op), 1))
     for j in range(N):
-        if n - 1 <= j < N - 1:
-            a = 1
+        H_1_ops, H_2_ops = get_unary_pauli_ops(n, N, j)
+        if j % 2 == 0:
+            if j % 4 == 0:
+                H_1_pauli_list_even_1 += H_1_ops
+                H_2_pauli_list_even_1 += H_2_ops
+            else:
+                H_1_pauli_list_even_2 += H_1_ops
+                H_2_pauli_list_even_2 += H_2_ops
         else:
-            a = 0
-
-        if 1 <= j <= N // 2:
-            b = 1
-        else:
-            b = 0
-                
-        if j >= n:
-            c = 1
-        else:
-            c = 0
-
-        # Hermitian part
-        op = n * ['I']
-        op[j%n] = 'X'
-        H_1_pauli_list.append((''.join(op), (-1) ** 0 /4))
-
-        op = n * ['I']
-        op[j%n] = 'X'
-        op[(j+1)%n] = 'Z'
-        H_1_pauli_list.append((''.join(op), (-1) ** (a+0) /4))
-
-        op = n * ['I']
-        op[j%n] = 'X'
-        op[(j-1)%n] = 'Z'
-        H_1_pauli_list.append((''.join(op), (-1) ** (b+0) /4))
-
-        op = n * ['I']
-        op[(j-1)%n] = 'Z'
-        op[j%n] = 'X'
-        op[(j+1)%n] = 'Z'
-        H_1_pauli_list.append((''.join(op), (-1) ** (a+b+0) /4))
-    
-        # Anti-Hermitian part
-        op = n * ['I']
-        op[j%n] = 'Y'
-        H_2_pauli_list.append((''.join(op), (-1) ** c /4))
-
-        op = n * ['I']
-        op[j%n] = 'Y'
-        op[(j+1)%n] = 'Z'
-        H_2_pauli_list.append((''.join(op), (-1) ** (a+c) /4))
-
-        op = n * ['I']
-        op[j%n] = 'Y'
-        op[(j-1)%n] = 'Z'
-        H_2_pauli_list.append((''.join(op), (-1) ** (b+c) /4))
-
-        op = n * ['I']
-        op[(j+1)%n] = 'Z'
-        op[j%n] = 'Y'
-        op[(j-1)%n] = 'Z'
-        H_2_pauli_list.append((''.join(op), (-1) ** (a+b+c) /4))
-
+            if j % 4 == 1:
+                H_1_pauli_list_odd_1 += H_1_ops
+                H_2_pauli_list_odd_1 += H_2_ops
+            else:
+                H_1_pauli_list_odd_2 += H_1_ops
+                H_2_pauli_list_odd_2 += H_2_ops
     # xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
 
     # First compute gate count & depth for simulating H_2
-    pauli_list = []
-    for i in range(len(H_2_pauli_list)):
-        pauli_list.append((H_2_pauli_list[i][0], -H_2_pauli_list[i][1]))
-
-    pauli_op = SparsePauliOp.from_list(pauli_list)
-
+    pauli_op_grouped = [SparsePauliOp.from_list(H_2_pauli_list_even_1),
+                        SparsePauliOp.from_list(H_2_pauli_list_even_2),
+                        SparsePauliOp.from_list(H_2_pauli_list_odd_1),
+                        SparsePauliOp.from_list(H_2_pauli_list_odd_2)]
+    
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
     elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
     else:
         raise ValueError(f"{trotter_method} not supported")
 
     compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-
 
     # Gates per Trotter step
     depth_herm = compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
+    two_qubit_gate_count_herm = compiled_circuit.num_nonlocal_gates()
 
     # Next do H_1 \otimes H_F
-    pauli_list = []
-    for i in range(len(H_1_pauli_list)):
-        pauli_list.append((H_1_pauli_list[i][0], -H_1_pauli_list[i][1]))
+    pauli_op_grouped = [SparsePauliOp.from_list(H_1_pauli_list_even_1),
+                        SparsePauliOp.from_list(H_1_pauli_list_even_2),
+                        SparsePauliOp.from_list(H_1_pauli_list_odd_1),
+                        SparsePauliOp.from_list(H_1_pauli_list_odd_2)]
     
+
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
     elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
     else:
         raise ValueError(f"{trotter_method} not supported")
-    
+
     compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-    depth_antiherm = parallelize_ctrl_circuit(compiled_circuit)
+    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(compiled_circuit)
+    print(depth_herm, depth_antiherm)
     # The anti-Hermitian part contributes at most 2*n_p*depth_antiherm to the depth, since we need to control on each ancilla qubit.
     # The factor of two is for controlling on '0' and '1'; it may be that this factor can be eliminated.
-    return depth_herm + 2 * n_p * depth_antiherm
+    return depth_herm + 2 * n_p * depth_antiherm, two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm
 
+def get_unary_pauli_ops(n, N, j):
+    # For input j, returns the four terms n_{j-1} X_j n_{j+1} after expanding n_j=(I-Z_j)/2
+    H_1_ops = []
+    H_2_ops = []
+    if n - 1 <= j < N - 1:
+        a = 1
+    else:
+        a = 0
+
+    if 1 <= j <= N // 2:
+        b = 1
+    else:
+        b = 0
+            
+    if j >= n:
+        c = 1
+    else:
+        c = 0
+
+    # Hermitian part
+    op = n * ['I']
+    op[j%n] = 'X'
+    H_1_ops.append((''.join(op), (-1) ** 0 /4))
+
+    op = n * ['I']
+    op[j%n] = 'X'
+    op[(j+1)%n] = 'Z'
+    H_1_ops.append((''.join(op), (-1) ** (a+0) /4))
+
+    op = n * ['I']
+    op[j%n] = 'X'
+    op[(j-1)%n] = 'Z'
+    H_1_ops.append((''.join(op), (-1) ** (b+0) /4))
+
+    op = n * ['I']
+    op[(j-1)%n] = 'Z'
+    op[j%n] = 'X'
+    op[(j+1)%n] = 'Z'
+    H_1_ops.append((''.join(op), (-1) ** (a+b+0) /4))
+
+    # Anti-Hermitian part
+    op = n * ['I']
+    op[j%n] = 'Y'
+    H_2_ops.append((''.join(op), (-1) ** c /4))
+
+    op = n * ['I']
+    op[j%n] = 'Y'
+    op[(j+1)%n] = 'Z'
+    H_2_ops.append((''.join(op), (-1) ** (a+c) / 4))
+
+    op = n * ['I']
+    op[j%n] = 'Y'
+    op[(j-1)%n] = 'Z'
+    H_2_ops.append((''.join(op), (-1) ** (b+c) / 4))
+
+    op = n * ['I']
+    op[(j+1)%n] = 'Z'
+    op[j%n] = 'Y'
+    op[(j-1)%n] = 'Z'
+    H_2_ops.append((''.join(op), (-1) ** (a+b+c) / 4))
+    return H_1_ops, H_2_ops
 
 def get_mcrz(n, theta):
     circ = QuantumCircuit(n)
@@ -505,7 +539,7 @@ def get_trotter_number_bell_basis(n, n_p, R, T, error_tol, num_samples, num_jobs
             r_max = r
     return r_max
 
-def bell_basis_depth_per_trotter_step(n_x, n_p, R, dt):
+def bell_basis_resources_per_trotter_step(n_x, n_p, R, dt):
     N = 2 ** n_x
 
     '''
@@ -668,7 +702,8 @@ def bell_basis_depth_per_trotter_step(n_x, n_p, R, dt):
     # Compile and optimize circuit
     compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
     depth = compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
-    return depth
+    two_qubit_gate_count = compiled_circuit.num_nonlocal_gates()
+    return depth, two_qubit_gate_count
 
 def get_trotter_number_pauli_basis(n, n_p, R, T, error_tol, num_samples, num_jobs):
     # Binary search to find Trotter number
@@ -726,7 +761,7 @@ def get_pauli_basis_one_step_trotter_error_one_sample(N, N_p, H_S, H_S_pauli_op,
 
     return np.linalg.norm(psi_no_trotter - psi_trotter, ord=2)
 
-def pauli_basis_depth_per_trotter_step(n_x, n_p, R, dt, trotter_method):
+def pauli_basis_resources_per_trotter_step(n_x, n_p, R, dt, trotter_method):
     N = 2 ** n_x
     N_p = 2 ** n_p
     h = 1 / N
@@ -737,7 +772,7 @@ def pauli_basis_depth_per_trotter_step(n_x, n_p, R, dt, trotter_method):
     A /= h
     H_1 = (A + np.conj(A.T)) / 2
     H_2 = (A - np.conj(A.T)) / 2j
-    H_F = (np.pi / R) * diags(np.fft.fftfreq(N_p, 1/N_p))
+    # H_F = (np.pi / R) * diags(np.fft.fftfreq(N_p, 1/N_p))
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
     H_2_pauli_list = SparsePauliOp.from_operator(H_2.toarray()).to_list()
     # H_F_pauli_list = SparsePauliOp.from_operator(H_F.toarray()).to_list()
@@ -748,36 +783,39 @@ def pauli_basis_depth_per_trotter_step(n_x, n_p, R, dt, trotter_method):
 
 
     pauli_op = SparsePauliOp.from_list(pauli_list)
+    pauli_op_grouped = pauli_op.group_commuting()
 
-    # Compute number of gates per Trotter step
-    if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
-    elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
-    else:
-        raise ValueError(f"{trotter_method} not supported")
+    trot_circuit = QuantumCircuit(n_x)
+    for i in range(len(pauli_op_grouped)):
+        trot_circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])), qargs=list(np.arange(n_x)))
+    if trotter_method == "second_order":
+        for i in range(len(pauli_op_grouped))[::-1]:
+            trot_circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])), qargs=list(np.arange(n_x)))
 
     compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
 
     # Gates per Trotter step
     depth_herm = compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
-
+    two_qubit_gate_count_herm = compiled_circuit.num_nonlocal_gates()
 
     # Next do H_1 \otimes H_F
     pauli_list = []
     for i in range(len(H_1_pauli_list)):
         pauli_list.append((H_1_pauli_list[i][0], -H_1_pauli_list[i][1]))
     
-    # Compute number of gates per Trotter step
-    if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
-    elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op.group_commuting()))
-    else:
-        raise ValueError(f"{trotter_method} not supported")
+    pauli_op = SparsePauliOp.from_list(pauli_list)
+    pauli_op_grouped = pauli_op.group_commuting()
+
+    trot_circuit = QuantumCircuit(n_x)
+    for i in range(len(pauli_op_grouped)):
+        trot_circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])), qargs=list(np.arange(n_x)))
+    if trotter_method == "second_order":
+        for i in range(len(pauli_op_grouped))[::-1]:
+            trot_circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])), qargs=list(np.arange(n_x)))
+
     
     compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-    depth_antiherm = parallelize_ctrl_circuit(compiled_circuit)
+    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(compiled_circuit)
     # The anti-Hermitian part contributes at most 2*n_p*depth_antiherm to the depth, since we need to control on each ancilla qubit.
     # The factor of two is for controlling on '0' and '1'; it may be that this factor can be eliminated.
-    return depth_herm + 2 * n_p * depth_antiherm
+    return depth_herm + 2 * n_p * depth_antiherm, two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm

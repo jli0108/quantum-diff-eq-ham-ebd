@@ -24,8 +24,9 @@ import resource
 def parallelize_ctrl_circuit(circuit):
     # Given an n-qubit circuit, perform a controlled version of the circuit using n+1 ancillas:.
     # For each layer of the circuit, perform the controlled version in parallel.
-    # Output: the depth and measurement rounds
+    # Output: the depth and two qubit gate count
     overall_depth = 0
+    two_qubit_gate_count = 0
     dag = circuit_to_dag(circuit)
 
     for layer in dag.layers():
@@ -40,9 +41,9 @@ def parallelize_ctrl_circuit(circuit):
             transpiled_qc = transpile(ctrl_qc, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
             if transpiled_qc.depth(lambda instr: len(instr.qubits) > 1) > max_depth:
                 max_depth = transpiled_qc.depth(lambda instr: len(instr.qubits) > 1)
-
+            two_qubit_gate_count += transpiled_qc.num_nonlocal_gates()
         overall_depth += max_depth
-    return overall_depth
+    return overall_depth, two_qubit_gate_count
 
 def get_xi_pauli_op(n_p, R):
     xi_pauli_list = []
@@ -579,8 +580,9 @@ def get_H_unary(N, n_p, R):
 
     return H_herm, H_antiherm, H_herm_sp_mats, H_antiherm_sp_mats
     
-def get_circuit_depth(n, n_p, H_herm, H_antiherm):
+def get_resource_estimate(n, n_p, H_herm, H_antiherm):
     depth = 0
+    two_qubit_gate_count = 0
 
     # First do Hermitian part (need fanout)
     for j in range(len(H_herm)):
@@ -590,16 +592,19 @@ def get_circuit_depth(n, n_p, H_herm, H_antiherm):
         # Do a controlled version
 
         compiled_circuit = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-        depth += parallelize_ctrl_circuit(compiled_circuit)
+        depth_tmp, two_qubit_gate_count_tmp = parallelize_ctrl_circuit(compiled_circuit)
+        # multiply by n_p since we need to do this for every qubit, and control on both 0 and 1
+        depth += 2 * n_p * depth_tmp
+        two_qubit_gate_count += 2 * n_p * two_qubit_gate_count_tmp
     
     # Next do anti-Hermitian part (just simulate normally)
     for j in range(len(H_antiherm)):
         circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(H_antiherm))
         compiled_circ = transpile(circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-        # multiply by n_p since we need to do this for every qubit
-        depth += n_p * compiled_circ.depth(lambda instr: len(instr.qubits) > 1)
+        depth += compiled_circ.depth(lambda instr: len(instr.qubits) > 1)
+        two_qubit_gate_count += compiled_circ.num_nonlocal_gates()
 
-    return depth
+    return depth, two_qubit_gate_count
 
 def sparse_comm(H1, H2):
     return H1 @ H2 - H2 @ H1
@@ -652,17 +657,17 @@ if __name__ == "__main__":
     print("Error tolerance:", error_tol, flush=True)
 
     pauli_basis_trotter_steps = np.zeros_like(N_vals)
-    pauli_basis_single_qubit_gates = np.zeros_like(N_vals)
+    # pauli_basis_single_qubit_gates = np.zeros_like(N_vals)
     pauli_basis_two_qubit_gates = np.zeros_like(N_vals)
     pauli_basis_circ_depth = np.zeros_like(N_vals)
 
     one_hot_trotter_steps = np.zeros_like(N_vals)
-    one_hot_single_qubit_gates = np.zeros_like(N_vals)
+    # one_hot_single_qubit_gates = np.zeros_like(N_vals)
     one_hot_two_qubit_gates = np.zeros_like(N_vals)
     one_hot_circ_depth = np.zeros_like(N_vals)
 
     unary_trotter_steps = np.zeros_like(N_vals)
-    unary_single_qubit_gates = np.zeros_like(N_vals)
+    # unary_single_qubit_gates = np.zeros_like(N_vals)
     unary_two_qubit_gates = np.zeros_like(N_vals)
     unary_circ_depth = np.zeros_like(N_vals)
 
@@ -674,7 +679,7 @@ if __name__ == "__main__":
         pauli_basis_trotter_steps[i] = get_first_order_trotter_steps(T, H_std_binary_sp_mats_herm + H_std_binary_sp_mats_antiherm, error_tol)
         print("Computing gates per Trotter step for Pauli basis.", flush=True)
         # pauli_basis_single_qubit_gates[i], pauli_basis_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_std_binary, trotter_method)
-        pauli_basis_circ_depth[i] = get_circuit_depth(n_x, n_p, H_std_binary_herm, H_std_binary_antiherm)
+        pauli_basis_circ_depth[i], pauli_basis_two_qubit_gates[i] = get_resource_estimate(n_x, n_p, H_std_binary_herm, H_std_binary_antiherm)
         
         '''One-hot encoding (ours)'''
         H_one_hot_herm, H_one_hot_antiherm, H_one_hot_sp_mats_herm, H_one_hot_sp_mats_antiherm = get_H_one_hot(N, n_p, R)
@@ -682,7 +687,7 @@ if __name__ == "__main__":
         one_hot_trotter_steps[i] = get_first_order_trotter_steps(T, H_one_hot_sp_mats_herm + H_one_hot_sp_mats_antiherm, error_tol)
         print("Computing gates per Trotter step for one-hot.", flush=True)
         # one_hot_single_qubit_gates[i], one_hot_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_one_hot, trotter_method)
-        one_hot_circ_depth[i] = get_circuit_depth(N, n_p, H_one_hot_herm, H_one_hot_antiherm)
+        one_hot_circ_depth[i], one_hot_two_qubit_gates[i] = get_resource_estimate(N, n_p, H_one_hot_herm, H_one_hot_antiherm)
 
         '''Unary encoding (ours)'''
         H_unary_herm, H_unary_antiherm, H_unary_sp_mats_herm, H_unary_sp_mats_antiherm = get_H_unary(N, n_p, R)
@@ -690,21 +695,21 @@ if __name__ == "__main__":
         unary_trotter_steps[i] = get_first_order_trotter_steps(T, H_unary_sp_mats_herm + H_unary_sp_mats_antiherm, error_tol)
         print("Computing gates per Trotter step for unary.", flush=True)
         # unary_single_qubit_gates[i], unary_two_qubit_gates[i] = get_gate_count_per_trotter_step(H_unary, trotter_method)
-        unary_circ_depth[i] = get_circuit_depth((N // 2), n_p, H_unary_herm, H_unary_antiherm)
+        unary_circ_depth[i], unary_two_qubit_gates[i] = get_resource_estimate((N // 2), n_p, H_unary_herm, H_unary_antiherm)
 
         np.savez(join("../resource_analysis_data", "nonlinear", f"nonlinear_data.npz"),
                 N_vals=N_vals[:i+1],
                 pauli_basis_trotter_steps=pauli_basis_trotter_steps[:i+1],
                 # pauli_basis_single_qubit_gates=pauli_basis_single_qubit_gates[:i+1],
-                # pauli_basis_two_qubit_gates=pauli_basis_two_qubit_gates[:i+1],
+                pauli_basis_two_qubit_gates=pauli_basis_two_qubit_gates[:i+1],
                 pauli_basis_circ_depth=pauli_basis_circ_depth[:i+1],
                 one_hot_trotter_steps=one_hot_trotter_steps[:i+1],
                 # one_hot_single_qubit_gates=one_hot_single_qubit_gates[:i+1],
-                # one_hot_two_qubit_gates=one_hot_two_qubit_gates[:i+1],
+                one_hot_two_qubit_gates=one_hot_two_qubit_gates[:i+1],
                 one_hot_circ_depth=one_hot_circ_depth[:i+1],
                 unary_trotter_steps=unary_trotter_steps[:i+1],
                 # unary_single_qubit_gates=unary_single_qubit_gates[:i+1],
-                # unary_two_qubit_gates=unary_two_qubit_gates[:i+1],
+                unary_two_qubit_gates=unary_two_qubit_gates[:i+1],
                 unary_circ_depth=unary_circ_depth[:i+1])
 
     end_time = time()
