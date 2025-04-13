@@ -30,3 +30,4 @@ There are a few other dependencies used in this project. Below are the relevant 
 - pytket 1.26.0
 - pytket-qiskit 0.51.0
 
+For plotting the simulation of a nonlinear hyperbolic PDE, we use Mathematica and [ReadNumPy](https://github.com/lr94/NumPyArray) for reading `.npy` files.
