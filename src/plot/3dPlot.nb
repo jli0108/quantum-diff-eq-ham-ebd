@@ -1,0 +1,579 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 13.2' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[     20645,        569]
+NotebookOptionsPosition[     20290,        555]
+NotebookOutlinePosition[     20690,        571]
+CellTagsIndexPosition[     20647,        568]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell[BoxData[{
+ RowBox[{"SetDirectory", "[", "\"\<../experiment_data/nonlinear\>\"", 
+  "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Get", "[", "\"\<NumPyArray`\>\"", "]"}], "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./test0.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.0\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{"Export", "[", 
+  RowBox[{"\"\<BurgersFigs/0.pdf\>\"", ",", " ", "f"}], "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Dynamic", "[", "v", "]"}], "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./test1.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.1\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/1.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./test2.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.2\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/2.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./test3.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.3\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/3.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./test4.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.4\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/4.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./test5.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.5\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/5.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./testLs0.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.0\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/LS0.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./testLS1.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.1\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/LS1.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./testLS2.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.2\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/LS2.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./testLS3.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.3\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/LS3.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./testLS4.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.4\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{
+  RowBox[{"Export", "[", 
+   RowBox[{"\"\<BurgersFigs/LS4.pdf\>\"", ",", " ", "f"}], "]"}], 
+  "\n"}], "\n", 
+ RowBox[{"data", " ", "=", " ", 
+  RowBox[{"ReadNumPyArray", "[", "\"\<./testLS5.npy\>\"", "]"}]}], "\n", 
+ RowBox[{
+  RowBox[{"f", " ", "=", " ", 
+   RowBox[{"ListSurfacePlot3D", "[", 
+    RowBox[{"data", ",", " ", 
+     RowBox[{"MaxPlotPoints", "->", "120"}], ",", " ", 
+     RowBox[{"PlotRange", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"Ticks", "->", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{"0", ",", "0.5", ",", "1"}], "}"}], ",", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"-", "1"}], ",", "0", ",", "1"}], "}"}]}], "}"}]}], ",", 
+     RowBox[{"ColorFunction", "->", "\"\<Rainbow\>\""}], ",", 
+     RowBox[{"BoxRatios", "->", 
+      RowBox[{"{", 
+       RowBox[{"1", ",", "1", ",", "1"}], "}"}]}], ",", 
+     RowBox[{"PlotLabel", "->", "\"\<T = 0.5\>\""}], ",", " ", 
+     RowBox[{"LabelStyle", " ", "->", " ", 
+      RowBox[{"{", 
+       RowBox[{"FontSize", " ", "->", " ", "20"}], "}"}]}], ",", " ", 
+     RowBox[{"ViewPoint", "->", 
+      RowBox[{"{", 
+       RowBox[{"1.42", ",", 
+        RowBox[{"-", "3"}], ",", "0.55"}], "}"}]}]}], "]"}]}], ";"}], "\n", 
+ RowBox[{"Show", "[", "f", "]"}], "\n", 
+ RowBox[{"Export", "[", 
+  RowBox[{"\"\<BurgersFigs/LS5.pdf\>\"", ",", " ", "f"}], "]"}]}], "Code",
+ CellChangeTimes->{
+  3.953240421737659*^9},ExpressionUUID->"bc2c1995-02d4-4d82-a17b-\
+ba36ec953636"]
+},
+WindowSize->{808, 911},
+WindowMargins->{{Automatic, 467}, {-136, Automatic}},
+FrontEndVersion->"13.2 for Mac OS X ARM (64-bit) (November 18, 2022)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"c4386f38-41d1-46fd-87de-f99a5c55e7ee"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[558, 20, 19728, 533, 1231, "Code",ExpressionUUID->"bc2c1995-02d4-4d82-a17b-ba36ec953636"]
+}
+]
+*)
+
+(* End of internal cache information *)
+
