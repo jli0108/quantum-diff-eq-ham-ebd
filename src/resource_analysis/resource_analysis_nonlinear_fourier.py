@@ -114,6 +114,13 @@ def get_resource_estimate(n_x, n_q, H):
     # Do a controlled version
     depth_tmp, two_qubit_gate_count_tmp = parallelize_ctrl_circuit(compiled_circuit)
     # Add the cost of fan-out
+    fanout_circ = QuantumCircuit(n_q)
+    for i in range(n_q - 1):
+        fanout_circ.cx(i, i + 1)
+    fanout_compiled_circ = transpile(fanout_circ, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    depth_tmp += 2 * fanout_compiled_circ.depth(lambda instr: len(instr.qubits) > 1)
+    two_qubit_gate_count_tmp += 2 * fanout_compiled_circ.num_nonlocal_gates()
+
     # The Pauli decomposition of Fourier frequencies involves n_x + 1 terms, one of which is the identity.
     # The n_x non-identity terms are Pauli-Z, which are basically controls (controlling on 0 and 1).
     # Thus, we multiply by a factor of (2 * n_x)
