@@ -29,7 +29,7 @@ one_hot_two_qubit_gates = data["one_hot_two_qubit_gates"]
 unary_circ_depth = data["unary_circ_depth"]
 unary_two_qubit_gates = data["unary_two_qubit_gates"]
 
-fig = plt.figure(figsize=(5,3.4))
+fig = plt.figure(figsize=(5.2,3.5))
 
 plt.plot(N_q_vals, pauli_basis_circ_depth, '-s', linewidth=1, color="red", label="Std binary (Pauli basis)")
 plt.plot(N_q_vals, one_hot_circ_depth, '-s', linewidth=1, color="green", label="One-hot")
@@ -53,5 +53,6 @@ plt.xlabel(rf"$N_q$ (number of grid points per dimension)")
 plt.yscale('log')
 plt.xscale('log', base=2)
 plt.xticks(N_q_vals, [str(j) for j in N_q_vals])
+plt.legend(loc="upper left")
 plt.legend()
 plt.savefig(join("..", "..", "figures", "Fig_5B_fourier.pdf"), bbox_inches='tight')
