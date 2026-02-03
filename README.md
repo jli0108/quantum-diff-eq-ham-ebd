@@ -14,9 +14,9 @@ The source code is organized as follows.
     - `src/experiments/` contains files used to run the 2D advection equation experiment.
     - `src/experiment_data` contains the experimental data.
     - `src/resource_analysis` contains scripts for running the empirical resource comparison between different embedding schemes.
-    Specifically, the scripts `resource_analysis_2d_adv_{scheme}.py` are used to obtain data shown in Figure 4.
-    The script `resource_analysis_nonlinear.py` is used to obtain data shown in Figure 5.
-    - `src/plot` contains scripts for generating Figures 3-5, which are saved in `figures/`.
+    Specifically, the scripts `resource_analysis_2d_adv_upwind_{scheme}.py` are used to obtain data shown in Figure 3.
+    The script `resource_analysis_nonlinear_fourier.py` is used to obtain data shown in Figure 4.
+    - `src/plot` contains scripts for generating Figures 3 and 4, which are saved in `figures/`.
 
 # Usage
 The code has been tested with Python 3.10 but should also work with some earlier versions such as 3.8 or 3.9.
