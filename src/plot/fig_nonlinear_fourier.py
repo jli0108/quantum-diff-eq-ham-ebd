@@ -14,8 +14,6 @@ plt.rcParams.update({
     "font.sans-serif": "Helvetica",
 })
 
-
-
 trotter_method = "first_order"
 data = np.load(f"../resource_analysis_data/nonlinear/nonlinear_fourier_data.npz")
 N_q_vals = data["N_q_vals"]
@@ -39,11 +37,12 @@ plt.xlabel(rf"$N_q$ (number of grid points per dimension)")
 plt.yscale('log')
 plt.xscale('log', base=2)
 plt.xticks(N_q_vals, [str(j) for j in N_q_vals])
-plt.savefig(join("..", "..", "figures", "Fig_4A.pdf"), bbox_inches='tight')
+plt.legend()
+plt.savefig(join("..", "..", "figures", "Fig_4B.pdf"), bbox_inches='tight')
 # plt.show()
 
 
-fig = plt.figure(figsize=(5,3.4))
+fig = plt.figure(figsize=(5.2,3.5))
 
 plt.plot(N_q_vals, pauli_basis_two_qubit_gates, '-s', linewidth=1, color="red", label="Std binary (Pauli basis)")
 plt.plot(N_q_vals, one_hot_two_qubit_gates, '-s', linewidth=1, color="green", label="One-hot")
@@ -55,4 +54,4 @@ plt.xscale('log', base=2)
 plt.xticks(N_q_vals, [str(j) for j in N_q_vals])
 plt.legend(loc="upper left")
 plt.legend()
-plt.savefig(join("..", "..", "figures", "Fig_4B.pdf"), bbox_inches='tight')
+plt.savefig(join("..", "..", "figures", "Fig_4C.pdf"), bbox_inches='tight')
