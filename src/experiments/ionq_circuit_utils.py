@@ -205,153 +205,152 @@ def get_native_circuit(num_qubits, instructions):
     op_list=[]
 
     for op in instructions:
-        match op["gate"]:
-            case "h":
-                # Hadamard = GPi2(0.25) @ Z, where Z is Pauli-Z rotation
-                qubit_phase[op["target"]] -= 0.5
-                qubit_phase[op["target"]] %= 1
-                op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.25) % 1, op["target"]))
+        if op["gate"] == "h":
+            # Hadamard = GPi2(0.25) @ Z, where Z is Pauli-Z rotation
+            qubit_phase[op["target"]] -= 0.5
+            qubit_phase[op["target"]] %= 1
+            op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.25) % 1, op["target"]))
                 
-            case "cnot":
-                # Hadamard on control
-                qubit_phase[op["control"]] -= 0.5
-                qubit_phase[op["control"]] %= 1
-                op_list.append(get_gpi2((qubit_phase[op["control"]] + 0.25) % 1, op["control"]))
-            
-                # XX rotation
-                op_list.append(get_ms([qubit_phase[op["control"]], qubit_phase[op["target"]]], 0.75, [op["control"], op["target"]]))
+        elif op["gate"] == "cnot":
+            # Hadamard on control
+            qubit_phase[op["control"]] -= 0.5
+            qubit_phase[op["control"]] %= 1
+            op_list.append(get_gpi2((qubit_phase[op["control"]] + 0.25) % 1, op["control"]))
+        
+            # XX rotation
+            op_list.append(get_ms([qubit_phase[op["control"]], qubit_phase[op["target"]]], 0.75, [op["control"], op["target"]]))
 
-                # Hadamard on control
-                qubit_phase[op["control"]] -= 0.5
-                qubit_phase[op["control"]] %= 1
-                op_list.append(get_gpi2((qubit_phase[op["control"]] + 0.25) % 1, op["control"]))
+            # Hadamard on control
+            qubit_phase[op["control"]] -= 0.5
+            qubit_phase[op["control"]] %= 1
+            op_list.append(get_gpi2((qubit_phase[op["control"]] + 0.25) % 1, op["control"]))
 
-                # Rz on control
-                qubit_phase[op["control"]] -= 0.25
-                qubit_phase[op["control"]] %= 1
+            # Rz on control
+            qubit_phase[op["control"]] -= 0.25
+            qubit_phase[op["control"]] %= 1
 
-                # Rx on target
-                op_list.append(get_gpi2((qubit_phase[op["target"]] + 0) % 1, op["target"]))
+            # Rx on target
+            op_list.append(get_gpi2((qubit_phase[op["target"]] + 0) % 1, op["target"]))
 
-            case "rz":
+        elif op["gate"] == "rz":
                 qubit_phase[op["target"]] -= op["rotation"] / (2 * np.pi)
                 qubit_phase[op["target"]] %= 1
 
-            case "ry":
-                if abs(op["rotation"]) > 1e-5:
-                    if abs(op["rotation"] / (2 * np.pi) - 0.25) < 1e-6:
-                        op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.25) % 1, op["target"]))
-                    elif abs(op["rotation"] / (2 * np.pi) + 0.25) < 1e-6:
-                        op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.75) % 1, op["target"]))
-                    elif abs(op["rotation"] / (2 * np.pi) - 0.5) < 1e-6:
-                        op_list.append(get_gpi((qubit_phase[op["target"]] + 0.25) % 1, op["target"]))
-                    elif abs(op["rotation"] / (2 * np.pi) + 0.5) < 1e-6:
-                        op_list.append(get_gpi((qubit_phase[op["target"]] + 0.75) % 1, op["target"]))
-                    else:
-                        # Basis change and do virtual Z rotation
-                        op_list.append(get_gpi2((qubit_phase[op["target"]] + 0) % 1, op["target"]))
-                        qubit_phase[op["target"]] -= op["rotation"] / (2 * np.pi)
-                        qubit_phase[op["target"]] %= 1
-                        op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.5) % 1, op["target"]))
+        elif op["gate"] == "ry":
+            if abs(op["rotation"]) > 1e-5:
+                if abs(op["rotation"] / (2 * np.pi) - 0.25) < 1e-6:
+                    op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.25) % 1, op["target"]))
+                elif abs(op["rotation"] / (2 * np.pi) + 0.25) < 1e-6:
+                    op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.75) % 1, op["target"]))
+                elif abs(op["rotation"] / (2 * np.pi) - 0.5) < 1e-6:
+                    op_list.append(get_gpi((qubit_phase[op["target"]] + 0.25) % 1, op["target"]))
+                elif abs(op["rotation"] / (2 * np.pi) + 0.5) < 1e-6:
+                    op_list.append(get_gpi((qubit_phase[op["target"]] + 0.75) % 1, op["target"]))
+                else:
+                    # Basis change and do virtual Z rotation
+                    op_list.append(get_gpi2((qubit_phase[op["target"]] + 0) % 1, op["target"]))
+                    qubit_phase[op["target"]] -= op["rotation"] / (2 * np.pi)
+                    qubit_phase[op["target"]] %= 1
+                    op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.5) % 1, op["target"]))
 
-            case "rx":
-                if abs(op["rotation"]) > 1e-5:
-                    if abs(op["rotation"] / (2 * np.pi) - 0.25) < 1e-6:
-                        op_list.append(get_gpi2((qubit_phase[op["target"]] + 0) % 1, op["target"]))
-                    elif abs(op["rotation"] / (2 * np.pi) + 0.25) < 1e-6:
-                        op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.5) % 1, op["target"]))
-                    elif abs(op["rotation"] / (2 * np.pi) - 0.5) < 1e-6:
-                        op_list.append(get_gpi((qubit_phase[op["target"]] + 0) % 1, op["target"]))
-                    elif abs(op["rotation"] / (2 * np.pi) + 0.5) < 1e-6:
-                        op_list.append(get_gpi((qubit_phase[op["target"]] + 0.5) % 1, op["target"]))
-                    else:
-                        op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.75) % 1, op["target"]))
-                        qubit_phase[op["target"]] -= op["rotation"] / (2 * np.pi) 
-                        qubit_phase[op["target"]] %= 1
-                        op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.25) % 1, op["target"]))
+        elif op["gate"] == "rx":
+            if abs(op["rotation"]) > 1e-5:
+                if abs(op["rotation"] / (2 * np.pi) - 0.25) < 1e-6:
+                    op_list.append(get_gpi2((qubit_phase[op["target"]] + 0) % 1, op["target"]))
+                elif abs(op["rotation"] / (2 * np.pi) + 0.25) < 1e-6:
+                    op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.5) % 1, op["target"]))
+                elif abs(op["rotation"] / (2 * np.pi) - 0.5) < 1e-6:
+                    op_list.append(get_gpi((qubit_phase[op["target"]] + 0) % 1, op["target"]))
+                elif abs(op["rotation"] / (2 * np.pi) + 0.5) < 1e-6:
+                    op_list.append(get_gpi((qubit_phase[op["target"]] + 0.5) % 1, op["target"]))
+                else:
+                    op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.75) % 1, op["target"]))
+                    qubit_phase[op["target"]] -= op["rotation"] / (2 * np.pi) 
+                    qubit_phase[op["target"]] %= 1
+                    op_list.append(get_gpi2((qubit_phase[op["target"]] + 0.25) % 1, op["target"]))
             
-            case "xx":
-                if np.abs(op["rotation"]) > 1e-5:
-                    if (op["rotation"] / (2 * np.pi)) % 1 <= 0.25 or (op["rotation"] / (2 * np.pi)) % 1 > 0.75:
-                        op_list.append(get_ms([qubit_phase[op["targets"][0]], qubit_phase[op["targets"][1]]], (op["rotation"] / (2 * np.pi)) % 1, op["targets"]))
-                    elif 0.25 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.5:
-                        op_list.append(get_gpi(qubit_phase[op["targets"][0]], op["targets"][0]))
-                        op_list.append(get_gpi(qubit_phase[op["targets"][1]], op["targets"][1]))
-                        op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.5) % 1, qubit_phase[op["targets"][1]]], 0.5 - ((op["rotation"] / (2 * np.pi)) % 1), op["targets"]))
-                    elif 0.5 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.75:
-                        op_list.append(get_gpi(qubit_phase[op["targets"][0]], op["targets"][0]))
-                        op_list.append(get_gpi(qubit_phase[op["targets"][1]], op["targets"][1]))
-                        op_list.append(get_ms([qubit_phase[op["targets"][0]], qubit_phase[op["targets"][1]]], ((op["rotation"] / (2 * np.pi)) % 1) - 0.5, op["targets"]))
-                    else:
-                        raise ValueError(f"Rotation angle is {op['rotation'] / (2 * np.pi)}, should be between 0 and 1")
+        elif op["gate"] == "xx":
+            if np.abs(op["rotation"]) > 1e-5:
+                if (op["rotation"] / (2 * np.pi)) % 1 <= 0.25 or (op["rotation"] / (2 * np.pi)) % 1 > 0.75:
+                    op_list.append(get_ms([qubit_phase[op["targets"][0]], qubit_phase[op["targets"][1]]], (op["rotation"] / (2 * np.pi)) % 1, op["targets"]))
+                elif 0.25 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.5:
+                    op_list.append(get_gpi(qubit_phase[op["targets"][0]], op["targets"][0]))
+                    op_list.append(get_gpi(qubit_phase[op["targets"][1]], op["targets"][1]))
+                    op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.5) % 1, qubit_phase[op["targets"][1]]], 0.5 - ((op["rotation"] / (2 * np.pi)) % 1), op["targets"]))
+                elif 0.5 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.75:
+                    op_list.append(get_gpi(qubit_phase[op["targets"][0]], op["targets"][0]))
+                    op_list.append(get_gpi(qubit_phase[op["targets"][1]], op["targets"][1]))
+                    op_list.append(get_ms([qubit_phase[op["targets"][0]], qubit_phase[op["targets"][1]]], ((op["rotation"] / (2 * np.pi)) % 1) - 0.5, op["targets"]))
+                else:
+                    raise ValueError(f"Rotation angle is {op['rotation'] / (2 * np.pi)}, should be between 0 and 1")
 
-            case "yy":
-                if np.abs(op["rotation"]) > 1e-5:
-                    if (op["rotation"] / (2 * np.pi)) % 1 <= 0.25 or (op["rotation"] / (2 * np.pi)) % 1 > 0.75:
-                        op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.25) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], (op["rotation"] / (2 * np.pi)) % 1, op["targets"]))
-                    elif 0.25 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.5:
-                        op_list.append(get_gpi(qubit_phase[op["targets"][0]] + 0.25, op["targets"][0]))
-                        op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
-                        op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.75) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], 0.5 - ((op["rotation"] / (2 * np.pi)) % 1), op["targets"]))
-                    elif 0.5 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.75:
-                        op_list.append(get_gpi(qubit_phase[op["targets"][0]] + 0.25, op["targets"][0]))
-                        op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
-                        op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.25) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], ((op["rotation"] / (2 * np.pi)) % 1) - 0.5, op["targets"]))
-                    else:
-                        raise ValueError(f"Rotation angle is {op['rotation'] / (2 * np.pi)}, should be between 0 and 1")
-                        
-            case "xy":
-                if np.abs(op["rotation"]) > 1e-5:
-                    if (op["rotation"] / (2 * np.pi)) % 1 <= 0.25 or (op["rotation"] / (2 * np.pi)) % 1 > 0.75:
-                        op_list.append(get_ms([qubit_phase[op["targets"][0]], (qubit_phase[op["targets"][1]] + 0.25) % 1], (op["rotation"] / (2 * np.pi)) % 1, op["targets"]))
-                    elif 0.25 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.5:
-                        op_list.append(get_gpi(qubit_phase[op["targets"][0]], op["targets"][0]))
-                        op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
-                        op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.5) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], 0.5 - ((op["rotation"] / (2 * np.pi)) % 1), op["targets"]))
-                    elif 0.5 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.75:
-                        op_list.append(get_gpi(qubit_phase[op["targets"][0]], op["targets"][0]))
-                        op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
-                        op_list.append(get_ms([qubit_phase[op["targets"][0]], (qubit_phase[op["targets"][1]] + 0.25) % 1], ((op["rotation"] / (2 * np.pi)) % 1) - 0.5, op["targets"]))
-                    else:
-                        raise ValueError(f"Rotation angle is {op['rotation'] / (2 * np.pi)}, should be between 0 and 1")
+        elif op["gate"] == "yy":
+            if np.abs(op["rotation"]) > 1e-5:
+                if (op["rotation"] / (2 * np.pi)) % 1 <= 0.25 or (op["rotation"] / (2 * np.pi)) % 1 > 0.75:
+                    op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.25) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], (op["rotation"] / (2 * np.pi)) % 1, op["targets"]))
+                elif 0.25 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.5:
+                    op_list.append(get_gpi(qubit_phase[op["targets"][0]] + 0.25, op["targets"][0]))
+                    op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
+                    op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.75) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], 0.5 - ((op["rotation"] / (2 * np.pi)) % 1), op["targets"]))
+                elif 0.5 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.75:
+                    op_list.append(get_gpi(qubit_phase[op["targets"][0]] + 0.25, op["targets"][0]))
+                    op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
+                    op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.25) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], ((op["rotation"] / (2 * np.pi)) % 1) - 0.5, op["targets"]))
+                else:
+                    raise ValueError(f"Rotation angle is {op['rotation'] / (2 * np.pi)}, should be between 0 and 1")
                     
-            case "zz":
-                if np.abs(op["rotation"]) > 1e-5:
-
-                    # Rotate to YY basis 
-                    op_list.append(get_gpi2((qubit_phase[op["targets"][0]] + 0.5) % 1, op["targets"][0]))
-                    op_list.append(get_gpi2((qubit_phase[op["targets"][1]] + 0.5) % 1, op["targets"][1]))
-
-                    # Apply YY rotation
-                    if (op["rotation"] / (2 * np.pi)) % 1 <= 0.25 or (op["rotation"] / (2 * np.pi)) % 1 > 0.75:
-                        op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.25) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], (op["rotation"] / (2 * np.pi)) % 1, op["targets"]))
-                    elif 0.25 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.5:
-                        op_list.append(get_gpi(qubit_phase[op["targets"][0]] + 0.25, op["targets"][0]))
-                        op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
-                        op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.75) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], 0.5 - ((op["rotation"] / (2 * np.pi)) % 1), op["targets"]))
-                    elif 0.5 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.75:
-                        op_list.append(get_gpi(qubit_phase[op["targets"][0]] + 0.25, op["targets"][0]))
-                        op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
-                        op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.25) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], ((op["rotation"] / (2 * np.pi)) % 1) - 0.5, op["targets"]))
-                    else:
-                        raise ValueError(f"Rotation angle is {op['rotation'] / (2 * np.pi)}, should be between 0 and 1")
+        elif op["gate"] == "xy":
+            if np.abs(op["rotation"]) > 1e-5:
+                if (op["rotation"] / (2 * np.pi)) % 1 <= 0.25 or (op["rotation"] / (2 * np.pi)) % 1 > 0.75:
+                    op_list.append(get_ms([qubit_phase[op["targets"][0]], (qubit_phase[op["targets"][1]] + 0.25) % 1], (op["rotation"] / (2 * np.pi)) % 1, op["targets"]))
+                elif 0.25 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.5:
+                    op_list.append(get_gpi(qubit_phase[op["targets"][0]], op["targets"][0]))
+                    op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
+                    op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.5) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], 0.5 - ((op["rotation"] / (2 * np.pi)) % 1), op["targets"]))
+                elif 0.5 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.75:
+                    op_list.append(get_gpi(qubit_phase[op["targets"][0]], op["targets"][0]))
+                    op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
+                    op_list.append(get_ms([qubit_phase[op["targets"][0]], (qubit_phase[op["targets"][1]] + 0.25) % 1], ((op["rotation"] / (2 * np.pi)) % 1) - 0.5, op["targets"]))
+                else:
+                    raise ValueError(f"Rotation angle is {op['rotation'] / (2 * np.pi)}, should be between 0 and 1")
                     
-                    # Rotate back
-                    op_list.append(get_gpi2(qubit_phase[op["targets"][0]], op["targets"][0]))
-                    op_list.append(get_gpi2(qubit_phase[op["targets"][1]], op["targets"][1]))
+        elif op["gate"] == "zz":
+            if np.abs(op["rotation"]) > 1e-5:
 
-            # phase stored in radians
-            case "gpi":
-                op_list.append(get_gpi(qubit_phase[op["target"]] + op["phase"], op["target"]))
+                # Rotate to YY basis 
+                op_list.append(get_gpi2((qubit_phase[op["targets"][0]] + 0.5) % 1, op["targets"][0]))
+                op_list.append(get_gpi2((qubit_phase[op["targets"][1]] + 0.5) % 1, op["targets"][1]))
 
-            case "gpi2":
-                op_list.append(get_gpi2(qubit_phase[op["target"]] + op["phase"], op["target"]))
+                # Apply YY rotation
+                if (op["rotation"] / (2 * np.pi)) % 1 <= 0.25 or (op["rotation"] / (2 * np.pi)) % 1 > 0.75:
+                    op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.25) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], (op["rotation"] / (2 * np.pi)) % 1, op["targets"]))
+                elif 0.25 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.5:
+                    op_list.append(get_gpi(qubit_phase[op["targets"][0]] + 0.25, op["targets"][0]))
+                    op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
+                    op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.75) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], 0.5 - ((op["rotation"] / (2 * np.pi)) % 1), op["targets"]))
+                elif 0.5 < (op["rotation"] / (2 * np.pi)) % 1 <= 0.75:
+                    op_list.append(get_gpi(qubit_phase[op["targets"][0]] + 0.25, op["targets"][0]))
+                    op_list.append(get_gpi(qubit_phase[op["targets"][1]] + 0.25, op["targets"][1]))
+                    op_list.append(get_ms([(qubit_phase[op["targets"][0]] + 0.25) % 1, (qubit_phase[op["targets"][1]] + 0.25) % 1], ((op["rotation"] / (2 * np.pi)) % 1) - 0.5, op["targets"]))
+                else:
+                    raise ValueError(f"Rotation angle is {op['rotation'] / (2 * np.pi)}, should be between 0 and 1")
+                
+                # Rotate back
+                op_list.append(get_gpi2(qubit_phase[op["targets"][0]], op["targets"][0]))
+                op_list.append(get_gpi2(qubit_phase[op["targets"][1]], op["targets"][1]))
 
-            case "ms":
-                op_list.append(get_ms([qubit_phase[op["targets"][0]] + op["phases"][0], qubit_phase[op["targets"][1]] + op["phases"][1]], op["angle"], op["targets"]))
+        # phase stored in radians
+        elif op["gate"] == "gpi":
+            op_list.append(get_gpi(qubit_phase[op["target"]] + op["phase"], op["target"]))
 
-            case _:
-                raise TypeError(f"Gate is {op['''gate''']}, not Rx, Ry, Rz, XX, YY, ZZ, or native")
+        elif op["gate"] == "gpi2":
+            op_list.append(get_gpi2(qubit_phase[op["target"]] + op["phase"], op["target"]))
+
+        elif op["gate"] == "ms":
+            op_list.append(get_ms([qubit_phase[op["targets"][0]] + op["phases"][0], qubit_phase[op["targets"][1]] + op["phases"][1]], op["angle"], op["targets"]))
+
+        else:
+            raise TypeError(f"Gate is {op['''gate''']}, not Rx, Ry, Rz, XX, YY, ZZ, or native")
 
     return op_list, qubit_phase
 
@@ -361,15 +360,14 @@ def get_native_gate_counts(instructions):
     two_qubit_gate_count = 0
 
     for op in instructions:
-        match op["gate"]:
-            case "gpi":
-                one_qubit_gate_count += 1
-            case "gpi2":
-                one_qubit_gate_count += 1
-            case "ms":
-                two_qubit_gate_count += 1
-            case _:
-                raise TypeError(f"Gate is {op['''gate''']}, not native")
+        if op["gate"] == "gpi":
+            one_qubit_gate_count += 1
+        elif op["gate"] == "gpi2":
+            one_qubit_gate_count += 1
+        elif op["gate"] == "ms":
+            two_qubit_gate_count += 1
+        else:
+            raise TypeError(f"Gate is {op['''gate''']}, not native")
     return one_qubit_gate_count, two_qubit_gate_count
 
 def get_qiskit_circuit(num_qubits, instructions):
