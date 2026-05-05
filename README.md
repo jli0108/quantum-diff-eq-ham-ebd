@@ -1,6 +1,8 @@
-# Quantum simulation of differential equations
+# Quantum simulation of differential equations via Hamiltonian embedding
 
-Project for solving differential equations using quantum computers.
+This repository contains code for quantum simulation of PDEs via Hamiltonian embedding.
+The manuscript titled "Resource-efficient quantum simulation of transport phenomena via Hamiltonian embedding" is available on [arXiv](https://arxiv.org/abs/2602.03099).
+
 
 This is a joint work by [Joseph Li](https://jli0108.github.io/), [Gengzhi Yang](https://github.com/Genz17), [Jiaqi Leng](https://jiaqileng.github.io/), and [Xiaodi Wu](https://www.cs.umd.edu/~xwu/).
 
