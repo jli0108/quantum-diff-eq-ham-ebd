@@ -1,6 +1,6 @@
 # Quantum simulation of differential equations via Hamiltonian embedding
 
-This repository contains code for quantum simulation of PDEs via Hamiltonian embedding.
+This repository contains source code and data for quantum simulation of PDEs via Hamiltonian embedding.
 The manuscript titled "Resource-efficient quantum simulation of transport phenomena via Hamiltonian embedding" is available on [arXiv](https://arxiv.org/abs/2602.03099).
 
 
