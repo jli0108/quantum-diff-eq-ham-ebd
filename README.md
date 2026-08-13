@@ -1,7 +1,7 @@
 # Quantum simulation of differential equations via Hamiltonian embedding
 
 This repository contains source code and data for quantum simulation of PDEs via Hamiltonian embedding.
-The manuscript titled "Resource-efficient quantum simulation of transport phenomena via Hamiltonian embedding" is available on [arXiv](https://arxiv.org/abs/2602.03099).
+The manuscript, which is titled "Resource-efficient quantum simulation of transport phenomena via Hamiltonian embedding," is available on [arXiv](https://arxiv.org/abs/2602.03099).
 
 
 This is a joint work by [Joseph Li](https://jli0108.github.io/), [Gengzhi Yang](https://github.com/Genz17), [Jiaqi Leng](https://jiaqileng.github.io/), and [Xiaodi Wu](https://www.cs.umd.edu/~xwu/).
@@ -23,7 +23,7 @@ The source code is organized as follows.
 # Usage
 The code has been tested with Python 3.10 but should also work with some earlier versions such as 3.8 or 3.9.
 
-The experiments are run using [SimuQ](https://pickspeng.github.io/SimuQ/), which can be installed from the [GitHub repository](https://github.com/PicksPeng/SimuQ) or through pip.
+The real-machine demonstrations are run using [SimuQ](https://pickspeng.github.io/SimuQ/), which can be installed from the [GitHub repository](https://github.com/PicksPeng/SimuQ) or through pip.
 
 There are a few other dependencies used in this project. Below are the relevant packages, along with the tested versions.
 - numpy 1.23.5
@@ -31,5 +31,6 @@ There are a few other dependencies used in this project. Below are the relevant 
 - qiskit 1.0.2
 - pytket 1.26.0
 - pytket-qiskit 0.51.0
+- qclib 0.1.12
 
 For plotting the simulation of a nonlinear hyperbolic PDE, we use Mathematica and [ReadNumPy](https://github.com/lr94/NumPyArray) for reading `.npy` files.
