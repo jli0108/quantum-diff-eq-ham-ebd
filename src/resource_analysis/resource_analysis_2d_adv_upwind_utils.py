@@ -1,28 +1,21 @@
-import numpy as np
-
-from scipy.sparse import eye, lil_matrix, diags
-from joblib import Parallel, delayed
-from resource_estimate_utils import *
+import sys
 from os.path import join
-from time import time
 
-from qiskit import QuantumCircuit
+import numpy as np
+from joblib import Parallel, delayed
+from qclib.gates.ldmcsu import Ldmcsu
+from qiskit import QuantumCircuit, transpile
+from qiskit.circuit.library import PauliEvolutionGate
+from qiskit.converters import circuit_to_dag, dag_to_circuit
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.synthesis import LieTrotter, SuzukiTrotter
-from qiskit import transpile
-from qiskit.transpiler.passes import RemoveBarriers
-from qiskit.circuit.library import PauliEvolutionGate
-from pytket import OpType
-from pytket.passes import RemoveRedundancies, CommuteThroughMultis, SequencePass, FullPeepholeOptimise, auto_rebase_pass
-from pytket.extensions.qiskit import qiskit_to_tk
-from qiskit.converters import circuit_to_dag, dag_to_circuit
+from scipy.sparse import diags, eye, lil_matrix
 
-from qclib.gates.ldmcsu import Ldmcsu
+from resource_estimate_utils import *
 
-from os.path import join
-import sys
 sys.path.append(join(".", ".."))
 from utils import *
+
 
 def parallelize_ctrl_circuit(circuit):
     # Given an n-qubit circuit, perform a controlled version of the circuit using n+1 ancillas:.
@@ -33,20 +26,23 @@ def parallelize_ctrl_circuit(circuit):
     dag = circuit_to_dag(circuit)
 
     for layer in dag.layers():
-
-        layer_as_circuit = dag_to_circuit(layer['graph'])
+        layer_as_circuit = dag_to_circuit(layer["graph"])
         # In between the fan-out gates, perform the controlled version of each gate
         # The overall depth only depends on the maximum depth of any controlled gate in the layer
         max_depth = 0
         for gate in layer_as_circuit.data:
             qc = QuantumCircuit.from_instructions([gate])
-            ctrl_qc = transpile(qc, basis_gates=['rx', 'ry', 'rz', 'rxx'], optimization_level=0).control(1, ctrl_state='1')
-            transpiled_qc = transpile(ctrl_qc, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-            if transpiled_qc.depth(lambda instr: len(instr.qubits) > 1) > max_depth:
-                max_depth = transpiled_qc.depth(lambda instr: len(instr.qubits) > 1)
+            ctrl_qc = transpile(
+                qc, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0
+            ).control(1, ctrl_state="1")
+            transpiled_qc = transpile(
+                ctrl_qc, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
+            )
+            max_depth = max(max_depth, transpiled_qc.depth(lambda instr: len(instr.qubits) > 1))
             two_qubit_gate_count += transpiled_qc.num_nonlocal_gates()
         overall_depth += max_depth
     return overall_depth, two_qubit_gate_count
+
 
 def estimate_one_step_trotter_error(N, N_p, R, dt, num_samples=1000, num_jobs=16):
 
@@ -55,33 +51,43 @@ def estimate_one_step_trotter_error(N, N_p, R, dt, num_samples=1000, num_jobs=16
     h = 1 / N
 
     H_1_diag = -eye(N) / h
-    H_1_even = lil_matrix((N,N), dtype=np.complex128)
-    H_1_odd = lil_matrix((N,N), dtype=np.complex128)
-    H_2_even = lil_matrix((N,N), dtype=np.complex128)
-    H_2_odd = lil_matrix((N,N), dtype=np.complex128)
+    H_1_even = lil_matrix((N, N), dtype=np.complex128)
+    H_1_odd = lil_matrix((N, N), dtype=np.complex128)
+    H_2_even = lil_matrix((N, N), dtype=np.complex128)
+    H_2_odd = lil_matrix((N, N), dtype=np.complex128)
     for i in range(N):
         if i % 2 == 0:
-            H_1_even[i,(i+1)%N] = 1
-            H_1_even[(i+1)%N,i] = 1
-            H_2_even[i,(i+1)%N] = 1j
-            H_2_even[(i+1)%N,i] = -1j
+            H_1_even[i, (i + 1) % N] = 1
+            H_1_even[(i + 1) % N, i] = 1
+            H_2_even[i, (i + 1) % N] = 1j
+            H_2_even[(i + 1) % N, i] = -1j
         else:
-            H_1_odd[i,(i+1)%N] = 1
-            H_1_odd[(i+1)%N,i] = 1
-            H_2_odd[i,(i+1)%N] = 1j
-            H_2_odd[(i+1)%N,i] = -1j
+            H_1_odd[i, (i + 1) % N] = 1
+            H_1_odd[(i + 1) % N, i] = 1
+            H_2_odd[i, (i + 1) % N] = 1j
+            H_2_odd[(i + 1) % N, i] = -1j
 
-    H_1_even /= (2 * h)
-    H_1_odd /= (2 * h)
-    H_2_even /= (2 * h)
-    H_2_odd /= (2 * h)
+    H_1_even /= 2 * h
+    H_1_odd /= 2 * h
+    H_2_even /= 2 * h
+    H_2_odd /= 2 * h
 
-    H_F = (np.pi / R) * diags(np.fft.fftfreq(N_p, 1/N_p))
+    H_F = (np.pi / R) * diags(np.fft.fftfreq(N_p, 1 / N_p))
 
     # print(f"Estimating Trotter error w/ {num_jobs} jobs", flush=True)x
-    return max(Parallel(n_jobs=num_jobs)(delayed(estimate_one_step_trotter_error_one_sample)(N, N_p, dt, H_1_diag, H_1_even, H_1_odd, H_2_even, H_2_odd, H_F) for _ in range(num_samples)))
+    return max(
+        Parallel(n_jobs=num_jobs)(
+            delayed(estimate_one_step_trotter_error_one_sample)(
+                N, N_p, dt, H_1_diag, H_1_even, H_1_odd, H_2_even, H_2_odd, H_F
+            )
+            for _ in range(num_samples)
+        )
+    )
 
-def estimate_one_step_trotter_error_one_sample(N, N_p, dt, H_1_diag, H_1_even, H_1_odd, H_2_even, H_2_odd, H_F):
+
+def estimate_one_step_trotter_error_one_sample(
+    N, N_p, dt, H_1_diag, H_1_even, H_1_odd, H_2_even, H_2_odd, H_F
+):
 
     H_1 = H_1_even + H_1_odd + H_1_diag
     H_2 = H_2_even + H_2_odd
@@ -91,80 +97,98 @@ def estimate_one_step_trotter_error_one_sample(N, N_p, dt, H_1_diag, H_1_even, H
     psi_0 /= np.linalg.norm(psi_0)
     psi_no_trotter = expm_multiply(-1j * dt * (H_S), psi_0)
 
-    psi_trotter = expm_multiply(-1j * (dt / 2) * (- kron(H_2_even, eye(N_p))), psi_0)
-    psi_trotter = expm_multiply(-1j * (dt / 2) * (- kron(H_2_odd, eye(N_p))), psi_trotter)
+    psi_trotter = expm_multiply(-1j * (dt / 2) * (-kron(H_2_even, eye(N_p))), psi_0)
+    psi_trotter = expm_multiply(
+        -1j * (dt / 2) * (-kron(H_2_odd, eye(N_p))), psi_trotter
+    )
     psi_trotter = expm_multiply(-1j * (dt / 2) * kron(H_1_even, H_F), psi_trotter)
     psi_trotter = expm_multiply(-1j * (dt / 2) * kron(H_1_odd, H_F), psi_trotter)
     psi_trotter = expm_multiply(-1j * dt * kron(H_1_diag, H_F), psi_trotter)
     psi_trotter = expm_multiply(-1j * (dt / 2) * kron(H_1_odd, H_F), psi_trotter)
     psi_trotter = expm_multiply(-1j * (dt / 2) * kron(H_1_even, H_F), psi_trotter)
-    psi_trotter = expm_multiply(-1j * (dt / 2) * (- kron(H_2_odd, eye(N_p))), psi_trotter)
-    psi_trotter = expm_multiply(-1j * (dt / 2) * (- kron(H_2_even, eye(N_p))), psi_trotter)
+    psi_trotter = expm_multiply(
+        -1j * (dt / 2) * (-kron(H_2_odd, eye(N_p))), psi_trotter
+    )
+    psi_trotter = expm_multiply(
+        -1j * (dt / 2) * (-kron(H_2_even, eye(N_p))), psi_trotter
+    )
 
     error = np.linalg.norm(psi_no_trotter - psi_trotter)
     return error
 
-def get_trotter_number_one_hot_or_unary(N, N_p, R, T, error_tol, num_samples=1000, num_jobs=16):
+
+def get_trotter_number_one_hot_or_unary(
+    N, N_p, R, T, error_tol, num_samples=1000, num_jobs=16
+):
     r_min, r_max = 1, 10
-    while r_max * estimate_one_step_trotter_error(N, N_p, R, T / r_max, num_samples, num_jobs) > error_tol:
+    while (
+        r_max
+        * estimate_one_step_trotter_error(N, N_p, R, T / r_max, num_samples, num_jobs)
+        > error_tol
+    ):
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if r * estimate_one_step_trotter_error(N, N_p, R, T / r, num_samples, num_jobs) > error_tol:
+        if (
+            r * estimate_one_step_trotter_error(N, N_p, R, T / r, num_samples, num_jobs)
+            > error_tol
+        ):
             r_min = r
         else:
             r_max = r
     return r_max
 
+
 def get_xi_pauli_op(n_p, R):
     xi_pauli_list = []
-    op = n_p * ['I']
-    xi_pauli_list.append((''.join(op), 1))
+    op = n_p * ["I"]
+    xi_pauli_list.append(("".join(op), 1))
 
     for i in range(n_p - 1):
-        op = n_p * ['I']
-        op[n_p-1-i] = 'Z'
-        xi_pauli_list.append((''.join(op), 2 ** i))
-    
-    op = n_p * ['I']
-    op[0] = 'Z'
-    xi_pauli_list.append((''.join(op), - 2 ** (n_p - 1)))
+        op = n_p * ["I"]
+        op[n_p - 1 - i] = "Z"
+        xi_pauli_list.append(("".join(op), 2**i))
+
+    op = n_p * ["I"]
+    op[0] = "Z"
+    xi_pauli_list.append(("".join(op), -(2 ** (n_p - 1))))
 
     xi_pauli_op = 0.5 * (2 * np.pi / (2 * R)) * SparsePauliOp.from_list(xi_pauli_list)
     return xi_pauli_op
 
+
 def one_hot_resources_per_trotter_step(N, n_p, R, trotter_method="second_order"):
-    '''Gets the structure for the circuit with a single Trotter step'''
+    """Gets the structure for the circuit with a single Trotter step"""
     H_1_pauli_list = []
     H_2_pauli_list = []
 
-    op = N * ['I']
-    H_1_pauli_list.append((''.join(op), 1))
+    op = N * ["I"]
+    H_1_pauli_list.append(("".join(op), 1))
     for j in range(N):
         # Hermitian part
-        op = N * ['I']
-        op[j] = 'X'
-        op[(j+1)%N] = 'X'
-        H_1_pauli_list.append((''.join(op), 1/2))
-        op = N * ['I']
-        op[j] = 'Y'
-        op[(j+1)%N] = 'Y'
-        H_1_pauli_list.append((''.join(op), 1/2))
-        
+        op = N * ["I"]
+        op[j] = "X"
+        op[(j + 1) % N] = "X"
+        H_1_pauli_list.append(("".join(op), 1 / 2))
+        op = N * ["I"]
+        op[j] = "Y"
+        op[(j + 1) % N] = "Y"
+        H_1_pauli_list.append(("".join(op), 1 / 2))
+
         # Anti-Hermitian part
-        op = N * ['I']
-        op[j] = 'X'
-        op[(j+1)%N] = 'Y'
-        H_2_pauli_list.append((''.join(op), 1/2))
-        op = N * ['I']
-        op[j] = 'Y'
-        op[(j+1)%N] = 'X'
-        H_2_pauli_list.append((''.join(op), -1/2))
+        op = N * ["I"]
+        op[j] = "X"
+        op[(j + 1) % N] = "Y"
+        H_2_pauli_list.append(("".join(op), 1 / 2))
+        op = N * ["I"]
+        op[j] = "Y"
+        op[(j + 1) % N] = "X"
+        H_2_pauli_list.append(("".join(op), -1 / 2))
 
     # xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
-    
+
     # First compute gate count & depth for simulating H_2
     pauli_list = []
     for i in range(len(H_2_pauli_list)):
@@ -175,13 +199,19 @@ def one_hot_resources_per_trotter_step(N, n_p, R, trotter_method="second_order")
 
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
+        trot_circuit = LieTrotter(reps=1).synthesize(
+            PauliEvolutionGate(pauli_op_grouped)
+        )
     elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(
+            PauliEvolutionGate(pauli_op_grouped)
+        )
     else:
         raise ValueError(f"{trotter_method} not supported")
 
-    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    compiled_circuit = transpile(
+        trot_circuit, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
+    )
 
     # Gates per Trotter step
     depth_herm = compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
@@ -191,28 +221,40 @@ def one_hot_resources_per_trotter_step(N, n_p, R, trotter_method="second_order")
     pauli_list = []
     for i in range(len(H_1_pauli_list)):
         pauli_list.append((H_1_pauli_list[i][0], -H_1_pauli_list[i][1]))
-    
+
     pauli_op = SparsePauliOp.from_list(pauli_list)
     pauli_op_grouped = pauli_op.group_commuting()
 
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
+        trot_circuit = LieTrotter(reps=1).synthesize(
+            PauliEvolutionGate(pauli_op_grouped)
+        )
     elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(
+            PauliEvolutionGate(pauli_op_grouped)
+        )
     else:
         raise ValueError(f"{trotter_method} not supported")
 
-    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(compiled_circuit)
+    compiled_circuit = transpile(
+        trot_circuit, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
+    )
+    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(
+        compiled_circuit
+    )
     # The anti-Hermitian part contributes at most 2*n_p*depth_antiherm to the depth, since we need to control on each ancilla qubit.
     # The factor of two is for controlling on '0' and '1'; it may be that this factor can be eliminated.
-    return depth_herm + 2 * n_p * depth_antiherm, two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm
+    return (
+        depth_herm + 2 * n_p * depth_antiherm,
+        two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm,
+    )
+
 
 def unary_resources_per_trotter_step(N, n_p, R, trotter_method="second_order"):
-    n = (N // 2)
+    n = N // 2
     assert n % 2 == 0, "Choose n to be even"
-    '''Gets the structure for the circuit with a single Trotter step'''
+    """Gets the structure for the circuit with a single Trotter step"""
     H_1_pauli_list_even_1 = []
     H_1_pauli_list_even_2 = []
     H_1_pauli_list_odd_1 = []
@@ -222,8 +264,8 @@ def unary_resources_per_trotter_step(N, n_p, R, trotter_method="second_order"):
     H_2_pauli_list_odd_1 = []
     H_2_pauli_list_odd_2 = []
 
-    op = n * ['I']
-    H_1_pauli_list_even_1.append((''.join(op), 1))
+    op = n * ["I"]
+    H_1_pauli_list_even_1.append(("".join(op), 1))
     for j in range(N):
         H_1_ops, H_2_ops = get_unary_pauli_ops(n, N, j)
         if j % 2 == 0:
@@ -243,46 +285,67 @@ def unary_resources_per_trotter_step(N, n_p, R, trotter_method="second_order"):
     # xi_pauli_list = get_xi_pauli_op(n_p, R).to_list()
 
     # First compute gate count & depth for simulating H_2
-    pauli_op_grouped = [SparsePauliOp.from_list(H_2_pauli_list_even_1),
-                        SparsePauliOp.from_list(H_2_pauli_list_even_2),
-                        SparsePauliOp.from_list(H_2_pauli_list_odd_1),
-                        SparsePauliOp.from_list(H_2_pauli_list_odd_2)]
-    
+    pauli_op_grouped = [
+        SparsePauliOp.from_list(H_2_pauli_list_even_1),
+        SparsePauliOp.from_list(H_2_pauli_list_even_2),
+        SparsePauliOp.from_list(H_2_pauli_list_odd_1),
+        SparsePauliOp.from_list(H_2_pauli_list_odd_2),
+    ]
+
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
+        trot_circuit = LieTrotter(reps=1).synthesize(
+            PauliEvolutionGate(pauli_op_grouped)
+        )
     elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(
+            PauliEvolutionGate(pauli_op_grouped)
+        )
     else:
         raise ValueError(f"{trotter_method} not supported")
 
-    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    compiled_circuit = transpile(
+        trot_circuit, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
+    )
 
     # Gates per Trotter step
     depth_herm = compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
     two_qubit_gate_count_herm = compiled_circuit.num_nonlocal_gates()
 
     # Next do H_1 \otimes H_F
-    pauli_op_grouped = [SparsePauliOp.from_list(H_1_pauli_list_even_1),
-                        SparsePauliOp.from_list(H_1_pauli_list_even_2),
-                        SparsePauliOp.from_list(H_1_pauli_list_odd_1),
-                        SparsePauliOp.from_list(H_1_pauli_list_odd_2)]
-    
+    pauli_op_grouped = [
+        SparsePauliOp.from_list(H_1_pauli_list_even_1),
+        SparsePauliOp.from_list(H_1_pauli_list_even_2),
+        SparsePauliOp.from_list(H_1_pauli_list_odd_1),
+        SparsePauliOp.from_list(H_1_pauli_list_odd_2),
+    ]
 
     # Compute number of gates per Trotter step
     if trotter_method == "first_order" or trotter_method == "randomized_first_order":
-        trot_circuit = LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
+        trot_circuit = LieTrotter(reps=1).synthesize(
+            PauliEvolutionGate(pauli_op_grouped)
+        )
     elif trotter_method == "second_order":
-        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped))
+        trot_circuit = SuzukiTrotter(order=2, reps=1).synthesize(
+            PauliEvolutionGate(pauli_op_grouped)
+        )
     else:
         raise ValueError(f"{trotter_method} not supported")
 
-    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(compiled_circuit)
+    compiled_circuit = transpile(
+        trot_circuit, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
+    )
+    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(
+        compiled_circuit
+    )
     print(depth_herm, depth_antiherm)
     # The anti-Hermitian part contributes at most 2*n_p*depth_antiherm to the depth, since we need to control on each ancilla qubit.
     # The factor of two is for controlling on '0' and '1'; it may be that this factor can be eliminated.
-    return depth_herm + 2 * n_p * depth_antiherm, two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm
+    return (
+        depth_herm + 2 * n_p * depth_antiherm,
+        two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm,
+    )
+
 
 def get_unary_pauli_ops(n, N, j):
     # For input j, returns the four terms n_{j-1} X_j n_{j+1} after expanding n_j=(I-Z_j)/2
@@ -297,68 +360,72 @@ def get_unary_pauli_ops(n, N, j):
         b = 1
     else:
         b = 0
-            
+
     if j >= n:
         c = 1
     else:
         c = 0
 
     # Hermitian part
-    op = n * ['I']
-    op[j%n] = 'X'
-    H_1_ops.append((''.join(op), (-1) ** 0 /4))
+    op = n * ["I"]
+    op[j % n] = "X"
+    H_1_ops.append(("".join(op), (-1) ** 0 / 4))
 
-    op = n * ['I']
-    op[j%n] = 'X'
-    op[(j+1)%n] = 'Z'
-    H_1_ops.append((''.join(op), (-1) ** (a+0) /4))
+    op = n * ["I"]
+    op[j % n] = "X"
+    op[(j + 1) % n] = "Z"
+    H_1_ops.append(("".join(op), (-1) ** (a + 0) / 4))
 
-    op = n * ['I']
-    op[j%n] = 'X'
-    op[(j-1)%n] = 'Z'
-    H_1_ops.append((''.join(op), (-1) ** (b+0) /4))
+    op = n * ["I"]
+    op[j % n] = "X"
+    op[(j - 1) % n] = "Z"
+    H_1_ops.append(("".join(op), (-1) ** (b + 0) / 4))
 
-    op = n * ['I']
-    op[(j-1)%n] = 'Z'
-    op[j%n] = 'X'
-    op[(j+1)%n] = 'Z'
-    H_1_ops.append((''.join(op), (-1) ** (a+b+0) /4))
+    op = n * ["I"]
+    op[(j - 1) % n] = "Z"
+    op[j % n] = "X"
+    op[(j + 1) % n] = "Z"
+    H_1_ops.append(("".join(op), (-1) ** (a + b + 0) / 4))
 
     # Anti-Hermitian part
-    op = n * ['I']
-    op[j%n] = 'Y'
-    H_2_ops.append((''.join(op), (-1) ** c /4))
+    op = n * ["I"]
+    op[j % n] = "Y"
+    H_2_ops.append(("".join(op), (-1) ** c / 4))
 
-    op = n * ['I']
-    op[j%n] = 'Y'
-    op[(j+1)%n] = 'Z'
-    H_2_ops.append((''.join(op), (-1) ** (a+c) / 4))
+    op = n * ["I"]
+    op[j % n] = "Y"
+    op[(j + 1) % n] = "Z"
+    H_2_ops.append(("".join(op), (-1) ** (a + c) / 4))
 
-    op = n * ['I']
-    op[j%n] = 'Y'
-    op[(j-1)%n] = 'Z'
-    H_2_ops.append((''.join(op), (-1) ** (b+c) / 4))
+    op = n * ["I"]
+    op[j % n] = "Y"
+    op[(j - 1) % n] = "Z"
+    H_2_ops.append(("".join(op), (-1) ** (b + c) / 4))
 
-    op = n * ['I']
-    op[(j+1)%n] = 'Z'
-    op[j%n] = 'Y'
-    op[(j-1)%n] = 'Z'
-    H_2_ops.append((''.join(op), (-1) ** (a+b+c) / 4))
+    op = n * ["I"]
+    op[(j + 1) % n] = "Z"
+    op[j % n] = "Y"
+    op[(j - 1) % n] = "Z"
+    H_2_ops.append(("".join(op), (-1) ** (a + b + c) / 4))
     return H_1_ops, H_2_ops
+
 
 def get_mcrz(n, theta):
     circ = QuantumCircuit(n)
     if n == 2:
         circ.crz(theta, control_qubit=0, target_qubit=1)
     else:
-        su2_matrix = np.array([[np.exp(-1.j * theta / 2.), 0.], [0., np.exp(1.j * theta / 2.)]])
+        su2_matrix = np.array(
+            [[np.exp(-1.0j * theta / 2.0), 0.0], [0.0, np.exp(1.0j * theta / 2.0)]]
+        )
 
-        circ.append(Ldmcsu(su2_matrix, int(n-1)), list(range(n)))
+        circ.append(Ldmcsu(su2_matrix, int(n - 1)), list(range(n)))
     return circ
+
 
 # Std binary implementation using Bell basis
 def get_w_circ(j, n, lamb, T):
-    
+
     circuit = QuantumCircuit(n)
     if j == 0:
         circuit.p(-lamb, j)
@@ -370,82 +437,96 @@ def get_w_circ(j, n, lamb, T):
     circuit.p(-lamb, j)
     circuit.h(j)
 
-    multi_controlled_rz = get_mcrz(j+1, 2 * T)
-    circuit.append(multi_controlled_rz, qargs=np.arange(0, j+1).tolist())
+    multi_controlled_rz = get_mcrz(j + 1, 2 * T)
+    circuit.append(multi_controlled_rz, qargs=np.arange(0, j + 1).tolist())
 
     circuit.h(j)
     circuit.p(lamb, j)
     for i in range(j):
-        circuit.cx(control_qubit=j, target_qubit=j-1-i)
+        circuit.cx(control_qubit=j, target_qubit=j - 1 - i)
     return circuit
 
+
 def get_v_circ(n, lamb, T, periodic=True, order="forward"):
-    N = 2 ** n
+    N = 2**n
     h = 1 / N
     circuit = QuantumCircuit(n)
-    
+
     if order == "forward":
         # First order Trotter
         for j in range(n):
-            circuit.append(get_w_circ(j, n, lamb, T / (2 * h)), qargs=np.arange(n).tolist())
+            circuit.append(
+                get_w_circ(j, n, lamb, T / (2 * h)), qargs=np.arange(n).tolist()
+            )
 
         if periodic:
-            for j in range(n-1):
-                circuit.cx(control_qubit=n-1, target_qubit=j)
-            circuit.p(lamb, n-1)
-            circuit.h(n-1)
-            for j in range(n-1):
+            for j in range(n - 1):
+                circuit.cx(control_qubit=n - 1, target_qubit=j)
+            circuit.p(lamb, n - 1)
+            circuit.h(n - 1)
+            for j in range(n - 1):
                 circuit.x(j)
 
             multi_controlled_rz = get_mcrz(n, 2 * T / (2 * h))
             circuit.append(multi_controlled_rz, qargs=np.arange(0, n).tolist())
 
-            for j in range(n-1):
+            for j in range(n - 1):
                 circuit.x(j)
-            circuit.h(n-1)
-            circuit.p(-lamb, n-1)
-            for j in range(n-1):
-                circuit.cx(control_qubit=n-1, target_qubit=n-2-j)
+            circuit.h(n - 1)
+            circuit.p(-lamb, n - 1)
+            for j in range(n - 1):
+                circuit.cx(control_qubit=n - 1, target_qubit=n - 2 - j)
     elif order == "backward":
         if periodic:
-            for j in range(n-1):
-                circuit.cx(control_qubit=n-1, target_qubit=j)
-            circuit.p(lamb, n-1)
-            circuit.h(n-1)
-            for j in range(n-1):
+            for j in range(n - 1):
+                circuit.cx(control_qubit=n - 1, target_qubit=j)
+            circuit.p(lamb, n - 1)
+            circuit.h(n - 1)
+            for j in range(n - 1):
                 circuit.x(j)
 
             multi_controlled_rz = get_mcrz(n, 2 * T / (2 * h))
             circuit.append(multi_controlled_rz, qargs=np.arange(0, n).tolist())
 
-            for j in range(n-1):
+            for j in range(n - 1):
                 circuit.x(j)
-            circuit.h(n-1)
-            circuit.p(-lamb, n-1)
-            for j in range(n-1):
-                circuit.cx(control_qubit=n-1, target_qubit=n-2-j)
+            circuit.h(n - 1)
+            circuit.p(-lamb, n - 1)
+            for j in range(n - 1):
+                circuit.cx(control_qubit=n - 1, target_qubit=n - 2 - j)
 
         for j in range(n):
-            circuit.append(get_w_circ(n-1-j, n, lamb, T / (2 * h)), qargs=np.arange(n).tolist())
+            circuit.append(
+                get_w_circ(n - 1 - j, n, lamb, T / (2 * h)), qargs=np.arange(n).tolist()
+            )
 
     return circuit
 
-def get_bell_basis_one_step_trotter_error(n_x, n_p, R, dt, num_samples=1000, num_jobs=16):
-    return max(Parallel(n_jobs=num_jobs)(delayed(get_bell_basis_one_step_trotter_error_one_sample)(n_x, n_p, R, dt) for _ in range(num_samples)))
+
+def get_bell_basis_one_step_trotter_error(
+    n_x, n_p, R, dt, num_samples=1000, num_jobs=16
+):
+    return max(
+        Parallel(n_jobs=num_jobs)(
+            delayed(get_bell_basis_one_step_trotter_error_one_sample)(n_x, n_p, R, dt)
+            for _ in range(num_samples)
+        )
+    )
+
 
 def get_bell_basis_one_step_trotter_error_one_sample(n_x, n_p, R, dt):
-    N = 2 ** n_x
-    N_p = 2 ** n_p
+    N = 2**n_x
+    N_p = 2**n_p
     h = 1 / N
 
     A = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
-        A[j,(j+1)%N] = 1
-        A[j,j] = -1
+        A[j, (j + 1) % N] = 1
+        A[j, j] = -1
     A /= h
     H_1 = (A + np.conj(A.T)) / 2
     H_2 = (A - np.conj(A.T)) / 2j
-    H_F = (np.pi / R) * diags(np.fft.fftfreq(N_p, 1/N_p))
+    H_F = (np.pi / R) * diags(np.fft.fftfreq(N_p, 1 / N_p))
     H_S = kron(H_1, H_F) - kron(H_2, eye(N_p))
     psi_0 = np.random.randn(N * N_p) + 1j * np.random.randn(N * N_p)
     psi_0 /= np.linalg.norm(psi_0)
@@ -453,28 +534,50 @@ def get_bell_basis_one_step_trotter_error_one_sample(n_x, n_p, R, dt):
     psi_no_trotter = expm_multiply(-1j * dt * H_S, psi_0)
     psi_trotter = np.copy(psi_0)
     # Hermitian part
-    lamb = -np.pi/2
+    lamb = -np.pi / 2
     for j in range(n_x):
-        op1 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X + 1j * PAULI_Y)] + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
-        op2 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X - 1j * PAULI_Y)] + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+        op1 = (
+            (n_x - 1 - j) * [IDENTITY]
+            + [0.5 * (PAULI_X + 1j * PAULI_Y)]
+            + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
+        )
+        op2 = (
+            (n_x - 1 - j) * [IDENTITY]
+            + [0.5 * (PAULI_X - 1j * PAULI_Y)]
+            + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+        )
         op = np.exp(-1j * lamb) * tensor(op1) + np.exp(1j * lamb) * tensor(op2)
-        psi_trotter = expm_multiply(-1j * 0.5 * dt * (kron(op, eye(N_p))) / (2 * h), psi_trotter)
+        psi_trotter = expm_multiply(
+            -1j * 0.5 * dt * (kron(op, eye(N_p))) / (2 * h), psi_trotter
+        )
     # Periodic boundary
     op1 = n_x * [0.5 * (PAULI_X - 1j * PAULI_Y)]
     op2 = n_x * [0.5 * (PAULI_X + 1j * PAULI_Y)]
     op = np.exp(-1j * lamb) * tensor(op1) + np.exp(1j * lamb) * tensor(op2)
-    psi_trotter = expm_multiply(-1j * 0.5 * dt * (kron(op, eye(N_p))) / (2 * h), psi_trotter)
+    psi_trotter = expm_multiply(
+        -1j * 0.5 * dt * (kron(op, eye(N_p))) / (2 * h), psi_trotter
+    )
 
     # Anti-Hermitian part
     lamb = 0
     # Control on first n_p-1 qubits for p
-    for k in range(n_p-1):
-        freq = diags((np.pi / R) * (2 ** k) * ((np.arange(N_p) // (2 ** k)) % 2))
+    for k in range(n_p - 1):
+        freq = diags((np.pi / R) * (2**k) * ((np.arange(N_p) // (2**k)) % 2))
         for j in range(n_x):
-            op1 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X + 1j * PAULI_Y)] + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
-            op2 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X - 1j * PAULI_Y)] + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+            op1 = (
+                (n_x - 1 - j) * [IDENTITY]
+                + [0.5 * (PAULI_X + 1j * PAULI_Y)]
+                + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
+            )
+            op2 = (
+                (n_x - 1 - j) * [IDENTITY]
+                + [0.5 * (PAULI_X - 1j * PAULI_Y)]
+                + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+            )
             op = np.exp(1j * lamb) * tensor(op1) + np.exp(-1j * lamb) * tensor(op2)
-            psi_trotter = expm_multiply(-1j * 0.5 * dt * (kron(op, freq)) / (2 * h), psi_trotter)
+            psi_trotter = expm_multiply(
+                -1j * 0.5 * dt * (kron(op, freq)) / (2 * h), psi_trotter
+            )
         # Periodic boundary
         op1 = n_x * [0.5 * (PAULI_X - 1j * PAULI_Y)]
         op2 = n_x * [0.5 * (PAULI_X + 1j * PAULI_Y)]
@@ -482,256 +585,379 @@ def get_bell_basis_one_step_trotter_error_one_sample(n_x, n_p, R, dt):
         psi_trotter = expm_multiply(-1j * dt * (kron(op, freq)) / (2 * h), psi_trotter)
 
         for j in range(n_x)[::-1]:
-            op1 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X + 1j * PAULI_Y)] + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
-            op2 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X - 1j * PAULI_Y)] + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+            op1 = (
+                (n_x - 1 - j) * [IDENTITY]
+                + [0.5 * (PAULI_X + 1j * PAULI_Y)]
+                + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
+            )
+            op2 = (
+                (n_x - 1 - j) * [IDENTITY]
+                + [0.5 * (PAULI_X - 1j * PAULI_Y)]
+                + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+            )
             op = np.exp(1j * lamb) * tensor(op1) + np.exp(-1j * lamb) * tensor(op2)
-            psi_trotter = expm_multiply(-1j * 0.5 * dt * (kron(op, freq)) / (2 * h), psi_trotter)
-    
+            psi_trotter = expm_multiply(
+                -1j * 0.5 * dt * (kron(op, freq)) / (2 * h), psi_trotter
+            )
+
     # Control on last qubit of p
-    freq = diags(-(np.pi / R) * (2 ** (n_p - 1)) * ((np.arange(N_p) // (2 ** (n_p - 1))) % 2))
+    freq = diags(
+        -(np.pi / R) * (2 ** (n_p - 1)) * ((np.arange(N_p) // (2 ** (n_p - 1))) % 2)
+    )
     for j in range(n_x):
-        op1 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X + 1j * PAULI_Y)] + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
-        op2 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X - 1j * PAULI_Y)] + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+        op1 = (
+            (n_x - 1 - j) * [IDENTITY]
+            + [0.5 * (PAULI_X + 1j * PAULI_Y)]
+            + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
+        )
+        op2 = (
+            (n_x - 1 - j) * [IDENTITY]
+            + [0.5 * (PAULI_X - 1j * PAULI_Y)]
+            + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+        )
         op = np.exp(1j * lamb) * tensor(op1) + np.exp(-1j * lamb) * tensor(op2)
-        psi_trotter = expm_multiply(-1j * 0.5 * dt * (kron(op, freq)) / (2 * h), psi_trotter)
-    
+        psi_trotter = expm_multiply(
+            -1j * 0.5 * dt * (kron(op, freq)) / (2 * h), psi_trotter
+        )
+
     # Periodic boundary
     op1 = n_x * [0.5 * (PAULI_X - 1j * PAULI_Y)]
     op2 = n_x * [0.5 * (PAULI_X + 1j * PAULI_Y)]
     op = np.exp(-1j * lamb) * tensor(op1) + np.exp(1j * lamb) * tensor(op2)
     psi_trotter = expm_multiply(-1j * dt * (kron(op, freq)) / (2 * h), psi_trotter)
     for j in range(n_x)[::-1]:
-        op1 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X + 1j * PAULI_Y)] + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
-        op2 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X - 1j * PAULI_Y)] + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+        op1 = (
+            (n_x - 1 - j) * [IDENTITY]
+            + [0.5 * (PAULI_X + 1j * PAULI_Y)]
+            + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
+        )
+        op2 = (
+            (n_x - 1 - j) * [IDENTITY]
+            + [0.5 * (PAULI_X - 1j * PAULI_Y)]
+            + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+        )
         op = np.exp(1j * lamb) * tensor(op1) + np.exp(-1j * lamb) * tensor(op2)
-        psi_trotter = expm_multiply(-1j * 0.5 * dt * (kron(op, freq)) / (2 * h), psi_trotter)
+        psi_trotter = expm_multiply(
+            -1j * 0.5 * dt * (kron(op, freq)) / (2 * h), psi_trotter
+        )
 
     # Diagonal part
     psi_trotter = expm_multiply(-1j * dt * (-kron(N * eye(N), H_F)), psi_trotter)
 
     # Hermitian part
-    lamb = -np.pi/2
+    lamb = -np.pi / 2
     # Periodic boundary
     op1 = n_x * [0.5 * (PAULI_X - 1j * PAULI_Y)]
     op2 = n_x * [0.5 * (PAULI_X + 1j * PAULI_Y)]
     op = np.exp(-1j * lamb) * tensor(op1) + np.exp(1j * lamb) * tensor(op2)
-    psi_trotter = expm_multiply(-1j * 0.5 * dt * (kron(op, eye(N_p))) / (2 * h), psi_trotter)
+    psi_trotter = expm_multiply(
+        -1j * 0.5 * dt * (kron(op, eye(N_p))) / (2 * h), psi_trotter
+    )
     for j in range(n_x)[::-1]:
-        op1 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X + 1j * PAULI_Y)] + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
-        op2 = (n_x-1-j) * [IDENTITY] + [0.5 * (PAULI_X - 1j * PAULI_Y)] + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+        op1 = (
+            (n_x - 1 - j) * [IDENTITY]
+            + [0.5 * (PAULI_X + 1j * PAULI_Y)]
+            + j * [0.5 * (PAULI_X - 1j * PAULI_Y)]
+        )
+        op2 = (
+            (n_x - 1 - j) * [IDENTITY]
+            + [0.5 * (PAULI_X - 1j * PAULI_Y)]
+            + j * [0.5 * (PAULI_X + 1j * PAULI_Y)]
+        )
         op = np.exp(-1j * lamb) * tensor(op1) + np.exp(1j * lamb) * tensor(op2)
-        psi_trotter = expm_multiply(-1j * 0.5 * dt * (kron(op, eye(N_p))) / (2 * h), psi_trotter)
-    
+        psi_trotter = expm_multiply(
+            -1j * 0.5 * dt * (kron(op, eye(N_p))) / (2 * h), psi_trotter
+        )
+
     return np.linalg.norm(psi_no_trotter - psi_trotter, ord=2)
+
 
 def get_trotter_number_bell_basis(n, n_p, R, T, error_tol, num_samples, num_jobs):
     # Binary search to find Trotter number
     r_min, r_max = 1, 10
-    while r_max * get_bell_basis_one_step_trotter_error(n, n_p, R, T / r_max, num_samples, num_jobs) > error_tol:
+    while (
+        r_max
+        * get_bell_basis_one_step_trotter_error(
+            n, n_p, R, T / r_max, num_samples, num_jobs
+        )
+        > error_tol
+    ):
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if r * get_bell_basis_one_step_trotter_error(n, n_p, R, T / r, num_samples, num_jobs) > error_tol:
+        if (
+            r
+            * get_bell_basis_one_step_trotter_error(
+                n, n_p, R, T / r, num_samples, num_jobs
+            )
+            > error_tol
+        ):
             r_min = r
         else:
             r_max = r
     return r_max
 
-def bell_basis_resources_per_trotter_step(n_x, n_p, R, dt):
-    N = 2 ** n_x
 
-    '''
+def bell_basis_resources_per_trotter_step(n_x, n_p, R, dt):
+    N = 2**n_x
+
+    """
         Contruct circuit using second-order Trotter.
         The Hamiltonian is split into the Hermitian part, anti-Hermitian part
-    '''
+    """
     # First n_p qubits are for p
     trot_circuit = QuantumCircuit(n_x + n_p)
 
     # Hermitian part
     lamb = -np.pi / 2
-    trot_circuit.append(get_v_circ(n_x, lamb, 0.5 * dt, periodic=True, order="forward"), qargs=np.arange(n_p, n_x + n_p).tolist())
+    trot_circuit.append(
+        get_v_circ(n_x, lamb, 0.5 * dt, periodic=True, order="forward"),
+        qargs=np.arange(n_p, n_x + n_p).tolist(),
+    )
 
     # Anti-Hermitian part (controlled simulation)
     lamb = 0
     # Controlled simulation
     for i in range(n_p - 1):
-        '''get_v_circ'''
-        T_v = 0.5 * (np.pi / R) * (2 ** i) * dt
+        """get_v_circ"""
+        T_v = 0.5 * (np.pi / R) * (2**i) * dt
         # print(T_v)
         n = n_x
         h = 1 / N
 
         for j in range(n):
-            '''get_w_circ'''
+            """get_w_circ"""
             T_w = T_v / (2 * h)
             if j == 0:
-                trot_circuit.p(-lamb, n_p+j)
-                trot_circuit.crx(2 * T_w, i, n_p+j)
-                trot_circuit.p(lamb, n_p+j)
+                trot_circuit.p(-lamb, n_p + j)
+                trot_circuit.crx(2 * T_w, i, n_p + j)
+                trot_circuit.p(lamb, n_p + j)
             else:
                 for k in range(j):
-                    trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+k)
-                trot_circuit.p(-lamb, n_p+j)
-                trot_circuit.h(n_p+j)
+                    trot_circuit.cx(control_qubit=n_p + j, target_qubit=n_p + k)
+                trot_circuit.p(-lamb, n_p + j)
+                trot_circuit.h(n_p + j)
 
-                multi_controlled_rz = get_mcrz(j+1, 2 * T_w)
-                trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[i], np.arange(n_p, n_p+j+1)]).tolist())
+                multi_controlled_rz = get_mcrz(j + 1, 2 * T_w)
+                trot_circuit.append(
+                    transpile(
+                        multi_controlled_rz,
+                        basis_gates=["rx", "ry", "rz", "rxx"],
+                        optimization_level=0,
+                    ).control(1),
+                    qargs=np.concatenate([[i], np.arange(n_p, n_p + j + 1)]).tolist(),
+                )
 
-                trot_circuit.h(n_p+j)
-                trot_circuit.p(lamb, n_p+j)
+                trot_circuit.h(n_p + j)
+                trot_circuit.p(lamb, n_p + j)
                 for k in range(j):
-                    trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+j-1-k)
+                    trot_circuit.cx(control_qubit=n_p + j, target_qubit=n_p + j - 1 - k)
 
-        for j in range(n-1):
-            trot_circuit.cx(control_qubit=n_p+n-1, target_qubit=n_p+j)
-        trot_circuit.p(lamb, n_p+n-1)
-        trot_circuit.h(n_p+n-1)
-        for j in range(n-1):
-            trot_circuit.x(n_p+j)
+        for j in range(n - 1):
+            trot_circuit.cx(control_qubit=n_p + n - 1, target_qubit=n_p + j)
+        trot_circuit.p(lamb, n_p + n - 1)
+        trot_circuit.h(n_p + n - 1)
+        for j in range(n - 1):
+            trot_circuit.x(n_p + j)
 
         multi_controlled_rz = get_mcrz(n, 4 * T_v / (2 * h))
-        trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[i], np.arange(n_p, n_x+n_p)]).tolist())
+        trot_circuit.append(
+            transpile(
+                multi_controlled_rz,
+                basis_gates=["rx", "ry", "rz", "rxx"],
+                optimization_level=0,
+            ).control(1),
+            qargs=np.concatenate([[i], np.arange(n_p, n_x + n_p)]).tolist(),
+        )
 
-        for j in range(n-1):
-            trot_circuit.x(n_p+j)
-        trot_circuit.h(n_p+n-1)
-        trot_circuit.p(-lamb, n_p+n-1)
-        for j in range(n-1):
-            trot_circuit.cx(control_qubit=n_p+n-1, target_qubit=n_p+n-2-j)
+        for j in range(n - 1):
+            trot_circuit.x(n_p + j)
+        trot_circuit.h(n_p + n - 1)
+        trot_circuit.p(-lamb, n_p + n - 1)
+        for j in range(n - 1):
+            trot_circuit.cx(control_qubit=n_p + n - 1, target_qubit=n_p + n - 2 - j)
 
         for j in range(n)[::-1]:
-            '''get_w_circ'''
+            """get_w_circ"""
             T_w = T_v / (2 * h)
             if j == 0:
-                trot_circuit.p(-lamb, n_p+j)
-                trot_circuit.crx(2 * T_w, i, n_p+j)
-                trot_circuit.p(lamb, n_p+j)
+                trot_circuit.p(-lamb, n_p + j)
+                trot_circuit.crx(2 * T_w, i, n_p + j)
+                trot_circuit.p(lamb, n_p + j)
             else:
                 for k in range(j):
-                    trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+k)
-                trot_circuit.p(-lamb, n_p+j)
-                trot_circuit.h(n_p+j)
+                    trot_circuit.cx(control_qubit=n_p + j, target_qubit=n_p + k)
+                trot_circuit.p(-lamb, n_p + j)
+                trot_circuit.h(n_p + j)
 
                 # multi_controlled_rz = RZGate(2 * T).control(int(j))
-                multi_controlled_rz = get_mcrz(j+1, 2 * T_w)
-                trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[i], np.arange(n_p, n_p+j+1)]).tolist())
+                multi_controlled_rz = get_mcrz(j + 1, 2 * T_w)
+                trot_circuit.append(
+                    transpile(
+                        multi_controlled_rz,
+                        basis_gates=["rx", "ry", "rz", "rxx"],
+                        optimization_level=0,
+                    ).control(1),
+                    qargs=np.concatenate([[i], np.arange(n_p, n_p + j + 1)]).tolist(),
+                )
 
-                trot_circuit.h(n_p+j)
-                trot_circuit.p(lamb, n_p+j)
+                trot_circuit.h(n_p + j)
+                trot_circuit.p(lamb, n_p + j)
                 for k in range(j):
-                    trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+j-1-k)
+                    trot_circuit.cx(control_qubit=n_p + j, target_qubit=n_p + j - 1 - k)
 
-    T_v = - 0.5 * (np.pi / R) * (2 ** (n_p-1)) * dt
+    T_v = -0.5 * (np.pi / R) * (2 ** (n_p - 1)) * dt
     n = n_x
     h = 1 / N
 
     for j in range(n):
-        '''get_w_circ'''
+        """get_w_circ"""
         T_w = T_v / (2 * h)
         if j == 0:
-            trot_circuit.p(-lamb, n_p+j)
-            trot_circuit.crx(2 * T_w, n_p-1, n_p+j)
-            trot_circuit.p(lamb, n_p+j)
+            trot_circuit.p(-lamb, n_p + j)
+            trot_circuit.crx(2 * T_w, n_p - 1, n_p + j)
+            trot_circuit.p(lamb, n_p + j)
         else:
             for k in range(j):
-                trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+k)
-            trot_circuit.p(-lamb, n_p+j)
-            trot_circuit.h(n_p+j)
+                trot_circuit.cx(control_qubit=n_p + j, target_qubit=n_p + k)
+            trot_circuit.p(-lamb, n_p + j)
+            trot_circuit.h(n_p + j)
 
             # multi_controlled_rz = RZGate(2 * T).control(int(j))
             # print(2 * T_w)
-            multi_controlled_rz = get_mcrz(j+1, 2 * T_w)
-            trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[n_p-1], np.arange(n_p, n_p+j+1)]).tolist())
+            multi_controlled_rz = get_mcrz(j + 1, 2 * T_w)
+            trot_circuit.append(
+                transpile(
+                    multi_controlled_rz,
+                    basis_gates=["rx", "ry", "rz", "rxx"],
+                    optimization_level=0,
+                ).control(1),
+                qargs=np.concatenate([[n_p - 1], np.arange(n_p, n_p + j + 1)]).tolist(),
+            )
 
-            trot_circuit.h(n_p+j)
-            trot_circuit.p(lamb, n_p+j)
+            trot_circuit.h(n_p + j)
+            trot_circuit.p(lamb, n_p + j)
             for k in range(j):
-                trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+j-1-k)
+                trot_circuit.cx(control_qubit=n_p + j, target_qubit=n_p + j - 1 - k)
 
-    for j in range(n-1):
-        trot_circuit.cx(control_qubit=n_p+n-1, target_qubit=n_p+j)
-    trot_circuit.p(lamb, n_p+n-1)
-    trot_circuit.h(n_p+n-1)
-    for j in range(n-1):
-        trot_circuit.x(n_p+j)
+    for j in range(n - 1):
+        trot_circuit.cx(control_qubit=n_p + n - 1, target_qubit=n_p + j)
+    trot_circuit.p(lamb, n_p + n - 1)
+    trot_circuit.h(n_p + n - 1)
+    for j in range(n - 1):
+        trot_circuit.x(n_p + j)
 
     multi_controlled_rz = get_mcrz(n, 4 * T_v / (2 * h))
-    trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[n_p-1], np.arange(n_p, n_x+n_p)]).tolist())
+    trot_circuit.append(
+        transpile(
+            multi_controlled_rz,
+            basis_gates=["rx", "ry", "rz", "rxx"],
+            optimization_level=0,
+        ).control(1),
+        qargs=np.concatenate([[n_p - 1], np.arange(n_p, n_x + n_p)]).tolist(),
+    )
 
-    for j in range(n-1):
-        trot_circuit.x(n_p+j)
-    trot_circuit.h(n_p+n-1)
-    trot_circuit.p(-lamb, n_p+n-1)
-    for j in range(n-1):
-        trot_circuit.cx(control_qubit=n_p+n-1, target_qubit=n_p+n-2-j)
+    for j in range(n - 1):
+        trot_circuit.x(n_p + j)
+    trot_circuit.h(n_p + n - 1)
+    trot_circuit.p(-lamb, n_p + n - 1)
+    for j in range(n - 1):
+        trot_circuit.cx(control_qubit=n_p + n - 1, target_qubit=n_p + n - 2 - j)
 
     for j in range(n)[::-1]:
-        '''get_w_circ'''
+        """get_w_circ"""
         T_w = T_v / (2 * h)
         if j == 0:
-            trot_circuit.p(-lamb, n_p+j)
-            trot_circuit.crx(2 * T_w, n_p-1, n_p+j)
-            trot_circuit.p(lamb, n_p+j)
+            trot_circuit.p(-lamb, n_p + j)
+            trot_circuit.crx(2 * T_w, n_p - 1, n_p + j)
+            trot_circuit.p(lamb, n_p + j)
         else:
             for k in range(j):
-                trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+k)
-            trot_circuit.p(-lamb, n_p+j)
-            trot_circuit.h(n_p+j)
+                trot_circuit.cx(control_qubit=n_p + j, target_qubit=n_p + k)
+            trot_circuit.p(-lamb, n_p + j)
+            trot_circuit.h(n_p + j)
 
             # multi_controlled_rz = RZGate(2 * T).control(int(j))
-            multi_controlled_rz = get_mcrz(j+1, 2 * T_w)
-            trot_circuit.append(transpile(multi_controlled_rz, basis_gates=["rx", "ry", "rz", "rxx"], optimization_level=0).control(1), qargs=np.concatenate([[n_p-1], np.arange(n_p, n_p+j+1)]).tolist())
+            multi_controlled_rz = get_mcrz(j + 1, 2 * T_w)
+            trot_circuit.append(
+                transpile(
+                    multi_controlled_rz,
+                    basis_gates=["rx", "ry", "rz", "rxx"],
+                    optimization_level=0,
+                ).control(1),
+                qargs=np.concatenate([[n_p - 1], np.arange(n_p, n_p + j + 1)]).tolist(),
+            )
 
-            trot_circuit.h(n_p+j)
-            trot_circuit.p(lamb, n_p+j)
+            trot_circuit.h(n_p + j)
+            trot_circuit.p(lamb, n_p + j)
             for k in range(j):
-                trot_circuit.cx(control_qubit=n_p+j, target_qubit=n_p+j-1-k)
+                trot_circuit.cx(control_qubit=n_p + j, target_qubit=n_p + j - 1 - k)
 
     # Diagonal part
-    for i in range(n_p-1):
-        trot_circuit.p(dt * N * (np.pi / R) * (2 ** i), i)
+    for i in range(n_p - 1):
+        trot_circuit.p(dt * N * (np.pi / R) * (2**i), i)
     trot_circuit.p(-dt * N * (np.pi / R) * (2 ** (n_p - 1)), n_p - 1)
 
     # Hermitian part
     lamb = -np.pi / 2
-    trot_circuit.append(get_v_circ(n_x, lamb, 0.5 * dt, periodic=True, order="backward"), qargs=np.arange(n_p, n_x + n_p).tolist())
-
+    trot_circuit.append(
+        get_v_circ(n_x, lamb, 0.5 * dt, periodic=True, order="backward"),
+        qargs=np.arange(n_p, n_x + n_p).tolist(),
+    )
 
     # Compile and optimize circuit
-    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    compiled_circuit = transpile(
+        trot_circuit, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
+    )
     depth = compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
     two_qubit_gate_count = compiled_circuit.num_nonlocal_gates()
     return depth, two_qubit_gate_count
 
+
 def get_trotter_number_pauli_basis(n, n_p, R, T, error_tol, num_samples, num_jobs):
     # Binary search to find Trotter number
     r_min, r_max = 1, 10
-    while r_max * get_pauli_basis_one_step_trotter_error(n, n_p, R, T / r_max, num_samples, num_jobs) > error_tol:
+    while (
+        r_max
+        * get_pauli_basis_one_step_trotter_error(
+            n, n_p, R, T / r_max, num_samples, num_jobs
+        )
+        > error_tol
+    ):
         r_max *= 2
 
     # binary search for r
     while r_max - r_min > 1:
         r = (r_min + r_max) // 2
-        if r * get_pauli_basis_one_step_trotter_error(n, n_p, R, T / r, num_samples, num_jobs) > error_tol:
+        if (
+            r
+            * get_pauli_basis_one_step_trotter_error(
+                n, n_p, R, T / r, num_samples, num_jobs
+            )
+            > error_tol
+        ):
             r_min = r
         else:
             r_max = r
     return r_max
 
-def get_pauli_basis_one_step_trotter_error(n_x, n_p, R, dt, num_samples=1000, num_jobs=16):
-    N = 2 ** n_x
-    N_p = 2 ** n_p
+
+def get_pauli_basis_one_step_trotter_error(
+    n_x, n_p, R, dt, num_samples=1000, num_jobs=16
+):
+    N = 2**n_x
+    N_p = 2**n_p
     h = 1 / N
     A = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
-        A[j,(j+1)%N] = 1
-        A[j,j] = -1
+        A[j, (j + 1) % N] = 1
+        A[j, j] = -1
     A /= h
     H_1 = (A + np.conj(A.T)) / 2
     H_2 = (A - np.conj(A.T)) / 2j
-    H_F = (np.pi / R) * diags(np.fft.fftfreq(N_p, 1/N_p))
+    H_F = (np.pi / R) * diags(np.fft.fftfreq(N_p, 1 / N_p))
     H_S = kron(H_1, H_F) - kron(H_2, eye(N_p))
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
     H_2_pauli_list = SparsePauliOp.from_operator(H_2.toarray()).to_list()
@@ -739,12 +965,27 @@ def get_pauli_basis_one_step_trotter_error(n_x, n_p, R, dt, num_samples=1000, nu
     H_S_pauli_list = []
     for i in range(len(H_1_pauli_list)):
         for j in range(len(H_F_pauli_list)):
-            H_S_pauli_list.append((H_1_pauli_list[i][0] + H_F_pauli_list[j][0], H_1_pauli_list[i][1] * H_F_pauli_list[j][1]))
+            H_S_pauli_list.append(
+                (
+                    H_1_pauli_list[i][0] + H_F_pauli_list[j][0],
+                    H_1_pauli_list[i][1] * H_F_pauli_list[j][1],
+                )
+            )
     for i in range(len(H_2_pauli_list)):
-        H_S_pauli_list.append((H_2_pauli_list[i][0] + ''.join(n_p * ['I']), -H_2_pauli_list[i][1]))
+        H_S_pauli_list.append(
+            (H_2_pauli_list[i][0] + "".join(n_p * ["I"]), -H_2_pauli_list[i][1])
+        )
     H_S_pauli_op = SparsePauliOp.from_list(H_S_pauli_list)
 
-    return max(Parallel(n_jobs=num_jobs)(delayed(get_pauli_basis_one_step_trotter_error_one_sample)(N, N_p, H_S, H_S_pauli_op, dt) for _ in range(num_samples)))
+    return max(
+        Parallel(n_jobs=num_jobs)(
+            delayed(get_pauli_basis_one_step_trotter_error_one_sample)(
+                N, N_p, H_S, H_S_pauli_op, dt
+            )
+            for _ in range(num_samples)
+        )
+    )
+
 
 def get_pauli_basis_one_step_trotter_error_one_sample(N, N_p, H_S, H_S_pauli_op, dt):
 
@@ -755,20 +996,24 @@ def get_pauli_basis_one_step_trotter_error_one_sample(N, N_p, H_S, H_S_pauli_op,
     psi_trotter = np.copy(psi_0)
 
     for j in range(len(H_S_pauli_op)):
-        psi_trotter = expm_multiply(-1j * 0.5 * dt * H_S_pauli_op[j].to_matrix(sparse=True), psi_trotter)
+        psi_trotter = expm_multiply(
+            -1j * 0.5 * dt * H_S_pauli_op[j].to_matrix(sparse=True), psi_trotter
+        )
     for j in range(len(H_S_pauli_op))[::-1]:
-        psi_trotter = expm_multiply(-1j * 0.5 * dt * H_S_pauli_op[j].to_matrix(sparse=True), psi_trotter)
+        psi_trotter = expm_multiply(
+            -1j * 0.5 * dt * H_S_pauli_op[j].to_matrix(sparse=True), psi_trotter
+        )
 
     return np.linalg.norm(psi_no_trotter - psi_trotter, ord=2)
 
+
 def pauli_basis_resources_per_trotter_step(n_x, n_p, R, dt, trotter_method):
-    N = 2 ** n_x
-    N_p = 2 ** n_p
+    N = 2**n_x
     h = 1 / N
     A = lil_matrix((N, N), dtype=np.complex128)
     for j in range(N):
-        A[j,(j+1)%N] = 1
-        A[j,j] = -1
+        A[j, (j + 1) % N] = 1
+        A[j, j] = -1
     A /= h
     H_1 = (A + np.conj(A.T)) / 2
     H_2 = (A - np.conj(A.T)) / 2j
@@ -776,23 +1021,30 @@ def pauli_basis_resources_per_trotter_step(n_x, n_p, R, dt, trotter_method):
     H_1_pauli_list = SparsePauliOp.from_operator(H_1.toarray()).to_list()
     H_2_pauli_list = SparsePauliOp.from_operator(H_2.toarray()).to_list()
     # H_F_pauli_list = SparsePauliOp.from_operator(H_F.toarray()).to_list()
-    
+
     pauli_list = []
     for i in range(len(H_2_pauli_list)):
         pauli_list.append((H_2_pauli_list[i][0], -H_2_pauli_list[i][1]))
-
 
     pauli_op = SparsePauliOp.from_list(pauli_list)
     pauli_op_grouped = pauli_op.group_commuting()
 
     trot_circuit = QuantumCircuit(n_x)
     for i in range(len(pauli_op_grouped)):
-        trot_circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])), qargs=list(np.arange(n_x)))
+        trot_circuit.append(
+            LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])),
+            qargs=list(np.arange(n_x)),
+        )
     if trotter_method == "second_order":
         for i in range(len(pauli_op_grouped))[::-1]:
-            trot_circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])), qargs=list(np.arange(n_x)))
+            trot_circuit.append(
+                LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])),
+                qargs=list(np.arange(n_x)),
+            )
 
-    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
+    compiled_circuit = transpile(
+        trot_circuit, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
+    )
 
     # Gates per Trotter step
     depth_herm = compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
@@ -802,20 +1054,32 @@ def pauli_basis_resources_per_trotter_step(n_x, n_p, R, dt, trotter_method):
     pauli_list = []
     for i in range(len(H_1_pauli_list)):
         pauli_list.append((H_1_pauli_list[i][0], -H_1_pauli_list[i][1]))
-    
+
     pauli_op = SparsePauliOp.from_list(pauli_list)
     pauli_op_grouped = pauli_op.group_commuting()
 
     trot_circuit = QuantumCircuit(n_x)
     for i in range(len(pauli_op_grouped)):
-        trot_circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])), qargs=list(np.arange(n_x)))
+        trot_circuit.append(
+            LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])),
+            qargs=list(np.arange(n_x)),
+        )
     if trotter_method == "second_order":
         for i in range(len(pauli_op_grouped))[::-1]:
-            trot_circuit.append(LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])), qargs=list(np.arange(n_x)))
+            trot_circuit.append(
+                LieTrotter(reps=1).synthesize(PauliEvolutionGate(pauli_op_grouped[i])),
+                qargs=list(np.arange(n_x)),
+            )
 
-    
-    compiled_circuit = transpile(trot_circuit, basis_gates=['rxx', 'rx', 'ry', 'rz'], optimization_level=3)
-    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(compiled_circuit)
+    compiled_circuit = transpile(
+        trot_circuit, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
+    )
+    depth_antiherm, two_qubit_gate_count_antiherm = parallelize_ctrl_circuit(
+        compiled_circuit
+    )
     # The anti-Hermitian part contributes at most 2*n_p*depth_antiherm to the depth, since we need to control on each ancilla qubit.
     # The factor of two is for controlling on '0' and '1'; it may be that this factor can be eliminated.
-    return depth_herm + 2 * n_p * depth_antiherm, two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm
+    return (
+        depth_herm + 2 * n_p * depth_antiherm,
+        two_qubit_gate_count_herm + 2 * n_p * two_qubit_gate_count_antiherm,
+    )
