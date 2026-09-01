@@ -105,9 +105,6 @@ def get_H_unary(N_q):
 def get_resource_estimate(n_x, n_q, H):
     depth = 0
     two_qubit_gate_count = 0
-    # N_x = 2 ** n_x
-    # D_x = np.diag(2 * np.pi * np.fft.fftfreq(n=N_x) * N_x)
-    # D_x_pauli_op = SparsePauliOp.from_operator(D_x)
 
     circuit = QuantumCircuit(n_q)
     circuit.append(
@@ -117,28 +114,15 @@ def get_resource_estimate(n_x, n_q, H):
     compiled_circuit = transpile(
         circuit, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
     )
-    # Non-controlled version
-    depth += compiled_circuit.depth(lambda instr: len(instr.qubits) > 1)
-    two_qubit_gate_count += compiled_circuit.num_nonlocal_gates()
 
     # Do a controlled version
     depth_tmp, two_qubit_gate_count_tmp = parallelize_ctrl_circuit(compiled_circuit)
-    # Add the cost of fan-out
-    fanout_circ = QuantumCircuit(n_q)
-    for i in range(n_q - 1):
-        fanout_circ.cx(i, i + 1)
-    fanout_compiled_circ = transpile(
-        fanout_circ, basis_gates=["rxx", "rx", "ry", "rz"], optimization_level=3
-    )
-    depth_tmp += 2 * fanout_compiled_circ.depth(lambda instr: len(instr.qubits) > 1)
-    two_qubit_gate_count_tmp += 2 * fanout_compiled_circ.num_nonlocal_gates()
 
-    # The Pauli decomposition of Fourier frequencies involves n_x + 1 terms, one of which is the identity.
-    # The n_x non-identity terms are Pauli-Z, which are basically controls (controlling on 0 and 1).
-    # Thus, we multiply by a factor of (2 * n_x)
+    # The Pauli decomposition of Fourier frequencies involves n_x terms of the form (I-Z), which serve as controls.
+    # Thus, we multiply by a factor of n_x.
     # The other factor of 2 is since we consider two spatial variables.
-    depth += 2 * (2 * n_x) * depth_tmp
-    two_qubit_gate_count += 2 * (2 * n_x) * two_qubit_gate_count_tmp
+    depth += 2 * n_x * depth_tmp
+    two_qubit_gate_count += 2 * n_x * two_qubit_gate_count_tmp
 
     return depth, two_qubit_gate_count
 
@@ -228,9 +212,10 @@ if __name__ == "__main__":
         pauli_basis_circ_depth[i], pauli_basis_two_qubit_gates[i] = (
             get_resource_estimate(n_x, int(np.log2(N_q)), H_std_binary)
         )
+        # QFT on x_1 and x_2 registers
         qft_depth, qft_gates = qft_cost(N_x, encoding="std_binary")
         pauli_basis_circ_depth[i] += 2 * qft_depth
-        pauli_basis_two_qubit_gates[i] += 2 * qft_gates
+        pauli_basis_two_qubit_gates[i] += 4 * qft_gates
 
         """One-hot encoding (ours)"""
         H_one_hot = get_H_one_hot(N_q)
@@ -238,9 +223,11 @@ if __name__ == "__main__":
         one_hot_circ_depth[i], one_hot_two_qubit_gates[i] = get_resource_estimate(
             n_x, N_q, H_one_hot
         )
-        qft_depth, qft_gates = qft_cost(N_x, encoding="one_hot")
+        print(one_hot_circ_depth[i])
+        # QFT on x_1 and x_2 registers
+        qft_depth, qft_gates = qft_cost(N_x, encoding="std_binary")
         one_hot_circ_depth[i] += 2 * qft_depth
-        one_hot_two_qubit_gates[i] += 2 * qft_gates
+        one_hot_two_qubit_gates[i] += 4 * qft_gates
 
         """Unary encoding (ours)"""
         H_unary = get_H_unary(N_q)
@@ -248,9 +235,11 @@ if __name__ == "__main__":
         unary_circ_depth[i], unary_two_qubit_gates[i] = get_resource_estimate(
             n_x, N_q - 1, H_unary
         )
-        qft_depth, qft_gates = qft_cost(N_x, encoding="unary")
+        print(unary_circ_depth[i])
+        # QFT on x_1 and x_2 registers
+        qft_depth, qft_gates = qft_cost(N_x, encoding="std_binary")
         unary_circ_depth[i] += 2 * qft_depth
-        unary_two_qubit_gates[i] += 2 * qft_gates
+        unary_two_qubit_gates[i] += 4 * qft_gates
 
         np.savez(
             join(
